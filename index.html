@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Suivi">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Suivi Muscu</title>
+<style>
+:root{
+  --bg:#0f1115; --card:#1a1d24; --card2:#232730; --line:#2c313c;
+  --txt:#e8eaed; --mut:#9aa3b2; --acc:#4f8cff; --green:#3ecf8e; --orange:#ff8a4c;
+  --red:#ff5c5c; --yellow:#ffd23f;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--txt);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-size:16px;line-height:1.4;overscroll-behavior-y:none}
+#app{max-width:560px;margin:0 auto;padding:calc(46px + env(safe-area-inset-top)) 14px 92px}
+h1{font-size:20px;margin:6px 0 14px}
+h2{font-size:16px;margin:18px 0 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.row{display:flex;align-items:center;gap:10px}
+.between{justify-content:space-between}
+.mut{color:var(--mut);font-size:13px}
+.tag{font-size:11px;padding:2px 8px;border-radius:99px;background:var(--card2);color:var(--mut)}
+.tag.main{background:#1d3a5f;color:#bcd6ff}
+.tag.cardio{background:#3a2a1d;color:#ffd6bc}
+button{font:inherit;color:var(--txt);background:var(--card2);border:1px solid var(--line);
+  border-radius:11px;padding:11px 14px;cursor:pointer;min-height:44px}
+button:active{transform:scale(.97)}
+button.acc{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
+button.gh{background:transparent}
+button.sm{padding:7px 11px;min-height:38px;font-size:14px;border-radius:9px}
+button.danger{color:var(--red);border-color:#5a2730;background:#2a1418}
+.full{width:100%}
+input,select{font:inherit;color:var(--txt);background:var(--bg);border:1px solid var(--line);
+  border-radius:10px;padding:10px;width:100%;min-height:44px}
+input:focus,select:focus{outline:2px solid var(--acc);border-color:var(--acc)}
+input[inputmode="decimal"],input[inputmode="numeric"],input[type="number"]{text-align:center}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.setrow{display:grid;grid-template-columns:34px 1fr 1fr 1fr 34px;gap:7px;align-items:center;margin-bottom:7px}
+.setrow .lab{font-size:10px;color:var(--mut);text-align:center}
+.chk{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:var(--bg);font-size:18px;cursor:pointer}
+.chk.on{background:var(--green);border-color:var(--green);color:#06231a}
+.topbar{position:fixed;top:0;left:0;right:0;z-index:40;display:flex;align-items:center;justify-content:space-between;
+  gap:10px;padding:6px 12px;padding-top:calc(6px + env(safe-area-inset-top));background:#12151b;border-bottom:1px solid var(--line)}
+.topbar .brand{font-weight:700;font-size:15px}
+.syncpill{display:flex;align-items:center;gap:7px;background:var(--card2);border:1px solid var(--line);
+  border-radius:99px;padding:5px 11px;font-size:12px;color:var(--mut);cursor:pointer;max-width:62vw}
+.syncpill .dot{width:8px;height:8px;border-radius:50%;background:var(--mut);flex:none}
+.syncpill.ok .dot{background:var(--green)}
+.syncpill.sync .dot{background:var(--yellow);animation:pulse 1s infinite}
+.syncpill.err .dot{background:var(--red)}
+.syncpill.off .dot{background:var(--mut)}
+@keyframes pulse{50%{opacity:.3}}
+nav{position:fixed;left:0;right:0;bottom:0;background:#12151b;border-top:1px solid var(--line);
+  display:flex;justify-content:space-around;padding:6px 4px calc(6px + env(safe-area-inset-bottom));z-index:30}
+nav button{flex:1;background:none;border:none;color:var(--mut);font-size:11px;display:flex;
+  flex-direction:column;align-items:center;gap:3px;padding:6px 2px;min-height:50px}
+nav button.on{color:var(--acc)}
+nav .ic{font-size:20px}
+.fab{position:fixed;right:18px;bottom:calc(78px + env(safe-area-inset-bottom));width:56px;height:56px;
+  border-radius:50%;background:var(--acc);color:#fff;border:none;font-size:28px;box-shadow:0 6px 18px rgba(0,0,0,.4);z-index:25}
+.crumb{font-size:13px;color:var(--mut);margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.crumb a{color:var(--acc);cursor:pointer}
+.empty{text-align:center;color:var(--mut);padding:40px 10px}
+.pill{display:inline-block;font-size:12px;color:var(--mut);background:var(--card2);padding:3px 9px;border-radius:8px}
+.stat{font-size:26px;font-weight:700}
+.bar{height:10px;background:var(--card2);border-radius:6px;overflow:hidden}
+.bar>span{display:block;height:100%;background:var(--acc)}
+svg{display:block;width:100%}
+.hr{height:1px;background:var(--line);margin:12px 0}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:#000;color:#fff;
+  padding:10px 16px;border-radius:10px;font-size:14px;z-index:50;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+.toast.show{opacity:.92}
+label.fld{display:block;font-size:12px;color:var(--mut);margin:0 0 4px}
+.mb{margin-bottom:10px}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">🏋️ Suivi Muscu</div>
+  <div id="sync" class="syncpill off"><span class="dot"></span><span id="syncTxt">local</span></div>
+</header>
+<div id="app"></div>
+<button class="fab" id="fab" style="display:none">+</button>
+<nav id="nav"></nav>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+const KEY="pl_app_v1";
+const CKEY="pl_cloud_v1";
+const API="https://api.jsonbin.io/v3";
+const uid=()=>Math.random().toString(36).slice(2,9);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const nowISO=()=>new Date().toISOString();
+const today=()=>new Date().toISOString().slice(0,10);
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1700);}
+
+const mkset=(p,r,rpe)=>({id:uid(),pct:p,load:null,reps:r,rpe:rpe,aLoad:null,aReps:null,aRpe:null,done:false,date:null});
+const mkcardio=(dur,dist)=>({id:uid(),dur:dur,dist:dist,aDur:null,aDist:null,done:false,date:null});
+
+/* ---------- state ---------- */
+let S=load();
+let view="prog";
+let nav={pi:null,wi:null,di:null};
+let sess={pi:null,wi:null,di:null};
+let statEx=null;
+
+function load(){
+  try{const r=JSON.parse(localStorage.getItem(KEY));if(r&&r.exercises)return migrate(r);}catch(e){}
+  return seed();
+}
+function persistLocal(){localStorage.setItem(KEY,JSON.stringify(S));}
+function persist(){S.updatedAt=nowISO();persistLocal();Cloud.markDirty();Cloud.schedulePush();}
+
+function migrate(o){
+  if(!o||!o.exercises)return o;
+  o.v=o.v||2;
+  if(o.updatedAt==null)o.updatedAt=nowISO();
+  if(!o.settings)o.settings={};
+  if(o.settings.round==null)o.settings.round=2.5;
+  if(!o.settings.sex)o.settings.sex="M";
+  if(!Array.isArray(o.bodyweight))o.bodyweight=[];
+  o.exercises.forEach(e=>{
+    if(!e.category)e.category=e.type==="SBD"?"Principal":"Autre";
+    if(!e.metric)e.metric="weight";
+    if(e.lift===undefined){
+      const n=(e.name||"").toLowerCase();
+      e.lift=/squat/.test(n)?"squat":/couch|bench|développé|developpe/.test(n)?"bench":/terre|deadlift|soulev/.test(n)?"deadlift":null;
+    }
+    if(e.orm==null)e.orm=0;
+  });
+  (o.programs||[]).forEach(p=>(p.weeks||[]).forEach(w=>(w.days||[]).forEach(d=>(d.items||[]).forEach(it=>(it.sets||[]).forEach(s=>{
+    ["aLoad","aReps","aRpe","aDur","aDist"].forEach(k=>{if(s[k]===undefined)s[k]=null;});
+    if(s.done===undefined)s.done=false;
+    if(s.date===undefined)s.date=null;
+  })))));
+  return o;
+}
+function seed(){
+  const sq={id:uid(),name:"Squat",category:"Principal",metric:"weight",lift:"squat",orm:180};
+  const bn={id:uid(),name:"Développé couché",category:"Principal",metric:"weight",lift:"bench",orm:120};
+  const dl={id:uid(),name:"Soulevé de terre",category:"Principal",metric:"weight",lift:"deadlift",orm:220};
+  const rw={id:uid(),name:"Rowing barre",category:"Haut du corps",metric:"weight",lift:null,orm:0};
+  return {
+    v:2,updatedAt:nowISO(),
+    exercises:[sq,bn,dl,rw],
+    settings:{round:2.5,sex:"M"},
+    bodyweight:[],
+    programs:[{id:uid(),name:"Bloc 1",weeks:[
+      {id:uid(),name:"Semaine 1",days:[
+        {id:uid(),name:"Séance A",items:[
+          {id:uid(),exId:sq.id,sets:[mkset(70,5,7),mkset(80,5,8),mkset(80,5,8)]},
+          {id:uid(),exId:bn.id,sets:[mkset(72,6,7),mkset(78,6,8)]},
+          {id:uid(),exId:rw.id,sets:[mkset(null,10,8),mkset(null,10,8)]}
+        ]},
+        {id:uid(),name:"Séance B",items:[
+          {id:uid(),exId:dl.id,sets:[mkset(75,4,8),mkset(82,3,8)]}
+        ]}
+      ]}
+    ]}]
+  };
+}
+
+/* ---------- helpers ---------- */
+const exById=id=>S.exercises.find(e=>e.id===id);
+const roundTo=v=>{const r=S.settings.round||2.5;return Math.round(v/r)*r;};
+function plannedLoad(set,ex){
+  if(set.pct!=null && ex && ex.orm>0) return roundTo(ex.orm*set.pct/100);
+  if(set.load!=null) return set.load;
+  return null;
+}
+const e1rm=(load,reps)=>load&&reps?Math.round(load*(1+reps/30)*10)/10:null;
+const fmt=v=>v==null||v===""?"–":(""+v).replace(/\.0$/,"");
+const isMain=ex=>ex&&ex.category==="Principal";
+
+/* ---------- cloud sync (jsonbin.io) ---------- */
+const Cloud={
+  cfg:{binId:"",key:"",lastSyncedAt:null},
+  dirty:false,pushTimer:null,status:"idle",
+  loadCfg(){try{const r=JSON.parse(localStorage.getItem(CKEY));if(r)this.cfg={...this.cfg,...r};}catch(e){}},
+  saveCfg(){localStorage.setItem(CKEY,JSON.stringify(this.cfg));},
+  enabled(){return !!(this.cfg.binId&&this.cfg.key);},
+  headers(extra){return Object.assign({"Content-Type":"application/json","X-Master-Key":this.cfg.key},extra||{});},
+  setStatus(s,msg){this.status=s;this.msg=msg||"";renderSync();},
+  markDirty(){this.dirty=true;renderSync();},
+  async apiCreate(){
+    const r=await fetch(API+"/b",{method:"POST",headers:this.headers({"X-Bin-Private":"true","X-Bin-Name":"suivi-muscu"}),body:JSON.stringify(S)});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();return j.metadata.id;
+  },
+  async apiGet(){
+    const r=await fetch(API+"/b/"+this.cfg.binId+"/latest",{headers:this.headers()});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const j=await r.json();return j.record;
+  },
+  async apiPut(){
+    const r=await fetch(API+"/b/"+this.cfg.binId,{method:"PUT",headers:this.headers(),body:JSON.stringify(S)});
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return true;
+  },
+  schedulePush(){
+    if(!this.enabled())return;
+    clearTimeout(this.pushTimer);
+    this.pushTimer=setTimeout(()=>this.push(),2000);
+  },
+  async push(){
+    if(!this.enabled()||!this.dirty)return;
+    if(!navigator.onLine){this.setStatus("off");return;}
+    this.setStatus("sync","Envoi…");
+    try{
+      await this.apiPut();
+      this.dirty=false;this.cfg.lastSyncedAt=S.updatedAt;this.saveCfg();
+      this.setStatus("ok");
+    }catch(e){this.setStatus("err",e.message);}
+  },
+  async pull(){
+    if(!this.enabled())return;
+    if(!navigator.onLine){this.setStatus("off");return;}
+    this.setStatus("sync","Réception…");
+    try{
+      const cloud=await this.apiGet();
+      if(!cloud||!cloud.exercises){this.dirty=true;await this.push();return;}
+      const cu=cloud.updatedAt||"",lu=S.updatedAt||"",ls=this.cfg.lastSyncedAt||"";
+      if(this.dirty && cu>ls && cu!==lu){
+        const keepCloud=confirm("Conflit de synchronisation.\nDes modifications existent sur CET appareil ET dans le cloud.\n\nOK = utiliser la version du CLOUD (annule les changements locaux)\nAnnuler = garder cet APPAREIL (écrasera le cloud)");
+        if(keepCloud)adoptCloud(cloud);else await this.push();
+      }else if(cu>lu){
+        adoptCloud(cloud);
+      }else if(lu>cu && this.dirty){
+        await this.push();
+      }else{
+        this.cfg.lastSyncedAt=cu||S.updatedAt;this.saveCfg();this.setStatus("ok");
+      }
+    }catch(e){this.setStatus("err",e.message);}
+  },
+  async syncNow(interactive){
+    if(!this.enabled()){if(interactive){go("data");toast("Configure le cloud (onglet Données)");}return;}
+    await this.pull();
+    if(this.dirty)await this.push();
+    if(this.status==="ok"&&interactive)toast("Synchronisé");
+  }
+};
+function adoptCloud(cloud){
+  S=migrate(cloud);
+  Cloud.dirty=false;Cloud.cfg.lastSyncedAt=S.updatedAt;Cloud.saveCfg();
+  persistLocal();render();Cloud.setStatus("ok");
+}
+function renderSync(){
+  const el=$("#sync");if(!el)return;
+  const txt=$("#syncTxt");
+  if(!Cloud.enabled()){el.className="syncpill off";if(txt)txt.textContent="local";el.title="Stockage local — touche pour configurer le cloud";return;}
+  const map={ok:["ok","à jour"],sync:["sync",Cloud.msg||"synchro…"],err:["err","erreur"],off:["off","hors-ligne"],idle:["off","prêt"]};
+  let key=Cloud.status;
+  if(key==="ok"&&Cloud.dirty)key="sync";
+  const m=map[key]||map.idle;
+  el.className="syncpill "+m[0];
+  if(txt)txt.textContent=(key==="sync"&&Cloud.dirty&&Cloud.status==="ok")?"à envoyer":m[1];
+  el.title=Cloud.msg||"";
+}
+
+/* ---------- render ---------- */
+function render(){
+  renderNav();
+  const a=$("#app");
+  if(view==="prog") a.innerHTML=nav.di!=null?viewDay():nav.wi!=null?viewWeek():nav.pi!=null?viewProgram():viewPrograms();
+  else if(view==="session") a.innerHTML=sess.di!=null?viewSessionLog():viewSessionPick();
+  else if(view==="stats") a.innerHTML=statEx?viewStatEx():viewStats();
+  else a.innerHTML=viewData();
+  setFab();
+  renderSync();
+  window.scrollTo(0,0);
+}
+function renderNav(){
+  const items=[["prog","📋","Programmes"],["session","🏋️","Séance"],["stats","📈","Stats"],["data","⚙️","Données"]];
+  $("#nav").innerHTML=items.map(([k,i,l])=>`<button class="${view===k?'on':''}" onclick="go('${k}')"><span class="ic">${i}</span>${l}</button>`).join("");
+}
+function go(v){view=v;statEx=null;render();}
+function setFab(){
+  const f=$("#fab");
+  let fn=null;
+  if(view==="prog"&&nav.pi==null) fn=addProgram;
+  else if(view==="prog"&&nav.wi==null) fn=addWeek;
+  else if(view==="prog"&&nav.di==null) fn=addDay;
+  else if(view==="prog"&&nav.di!=null) fn=addItem;
+  if(fn){f.style.display="block";f.onclick=fn;}else f.style.display="none";
+}
+
+/* ----- Programmes (builder) ----- */
+function viewPrograms(){
+  if(!S.programs.length) return `<h1>Programmes</h1><div class="empty">Aucun programme.<br>Touche + pour en créer un.</div>`;
+  return `<h1>Programmes</h1>`+S.programs.map((p,i)=>{
+    const w=p.weeks.length, d=p.weeks.reduce((s,x)=>s+x.days.length,0);
+    return `<div class="card row between" onclick="openProg(${i})">
+      <div><div style="font-weight:600;font-size:17px">${esc(p.name)}</div>
+      <div class="mut">${w} semaine${w>1?'s':''} · ${d} séance${d>1?'s':''}</div></div>
+      <div class="mut">›</div></div>`;
+  }).join("");
+}
+function viewProgram(){
+  const p=S.programs[nav.pi];
+  return crumb([["Programmes",()=>{nav.pi=null;}]],p.name)+
+  `<div class="row between"><h1 style="margin:0">${esc(p.name)}</h1>
+   <button class="sm gh" onclick="renameProg()">Renommer</button></div>
+   <h2>Semaines</h2>`+
+   (p.weeks.length?p.weeks.map((w,i)=>{
+     const d=w.days.length;
+     return `<div class="card row between" onclick="openWeek(${i})">
+       <div><div style="font-weight:600">${esc(w.name)}</div><div class="mut">${d} séance${d>1?'s':''}</div></div>
+       <div class="mut">›</div></div>`;
+   }).join(""):`<div class="empty">Aucune semaine. Touche +.</div>`)+
+   `<button class="full danger sm" style="margin-top:8px" onclick="delProgram()">Supprimer ce programme</button>`;
+}
+function viewWeek(){
+  const p=S.programs[nav.pi], w=p.weeks[nav.wi];
+  return crumb([["Programmes",()=>{nav.pi=null;nav.wi=null;}],[p.name,()=>{nav.wi=null;}]],w.name)+
+  `<div class="row between"><h1 style="margin:0">${esc(w.name)}</h1>
+   <button class="sm gh" onclick="renameWeek()">Renommer</button></div>
+   <button class="full sm gh mb" onclick="dupWeek()">⧉ Dupliquer cette semaine</button>
+   <h2>Séances</h2>`+
+   (w.days.length?w.days.map((d,i)=>{
+     const n=d.items.reduce((s,it)=>s+it.sets.length,0);
+     return `<div class="card row between" onclick="openDay(${i})">
+       <div><div style="font-weight:600">${esc(d.name)}</div>
+       <div class="mut">${d.items.length} exo · ${n} séries</div></div><div class="mut">›</div></div>`;
+   }).join(""):`<div class="empty">Aucune séance. Touche +.</div>`)+
+   `<button class="full danger sm" style="margin-top:8px" onclick="delWeek()">Supprimer cette semaine</button>`;
+}
+function viewDay(){
+  const p=S.programs[nav.pi], w=p.weeks[nav.wi], d=w.days[nav.di];
+  let h=crumb([["Programmes",()=>{nav.pi=null;nav.wi=null;nav.di=null;}],
+    [p.name,()=>{nav.wi=null;nav.di=null;}],[w.name,()=>{nav.di=null;}]],d.name)+
+  `<div class="row between"><h1 style="margin:0">${esc(d.name)}</h1>
+   <button class="sm gh" onclick="renameDay()">Renommer</button></div>
+   <div class="mut mb">Définis ici le prévu. Le logging se fait dans l'onglet Séance.</div>`;
+  if(!d.items.length) h+=`<div class="empty">Aucun exercice. Touche +.</div>`;
+  d.items.forEach((it,ei)=>{
+    const ex=exById(it.exId);
+    const cardio=ex&&ex.metric==="cardio";
+    const tagCls=isMain(ex)?"main":cardio?"cardio":"";
+    h+=`<div class="card"><div class="row between mb">
+      <div><span style="font-weight:600">${esc(ex?ex.name:'?')}</span>
+      <span class="tag ${tagCls}">${ex?esc(ex.category):''}</span></div>
+      <button class="sm danger" onclick="delItem(${ei})">✕</button></div>`;
+    h+= cardio
+      ? `<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`
+      : `<div class="setrow"><div></div><div class="lab">${ex&&ex.orm>0?'%1RM':'KG'}</div><div class="lab">REPS</div><div class="lab">RPE</div><div></div></div>`;
+    it.sets.forEach((set,si)=>{
+      if(cardio){
+        h+=`<div class="setrow">
+          <div class="lab" style="text-align:center">${si+1}</div>
+          <input inputmode="decimal" placeholder="min" value="${set.dur!=null?set.dur:''}" data-k="plan" data-f="dur" data-ei="${ei}" data-si="${si}">
+          <input inputmode="decimal" placeholder="km" value="${set.dist!=null?set.dist:''}" data-k="plan" data-f="dist" data-ei="${ei}" data-si="${si}">
+          <div></div>
+          <button class="sm danger" onclick="delSet(${ei},${si})">✕</button>
+        </div>`;
+      }else{
+        const pl=plannedLoad(set,ex);
+        h+=`<div class="setrow">
+          <div class="lab" style="text-align:center">${si+1}</div>
+          <input inputmode="decimal" placeholder="${ex&&ex.orm>0?'%':'kg'}" value="${set.pct!=null?set.pct:(set.load!=null?set.load:'')}" data-k="plan" data-f="${ex&&ex.orm>0?'pct':'load'}" data-ei="${ei}" data-si="${si}">
+          <input inputmode="numeric" placeholder="reps" value="${set.reps!=null?set.reps:''}" data-k="plan" data-f="reps" data-ei="${ei}" data-si="${si}">
+          <input inputmode="decimal" placeholder="rpe" value="${set.rpe!=null?set.rpe:''}" data-k="plan" data-f="rpe" data-ei="${ei}" data-si="${si}">
+          <button class="sm danger" onclick="delSet(${ei},${si})">✕</button>
+        </div>${pl?`<div class="mut" style="margin:-3px 0 7px 40px">≈ ${pl} kg</div>`:''}`;
+      }
+    });
+    h+=`<button class="full sm gh" onclick="addSet(${ei})">+ série</button></div>`;
+  });
+  return h;
+}
+
+/* ----- Séance (logging) ----- */
+function viewSessionPick(){
+  let h=`<h1>Séance — choisir</h1>`;
+  if(!S.programs.length) return h+`<div class="empty">Crée d'abord un programme.</div>`;
+  S.programs.forEach((p,pi)=>{
+    h+=`<h2>${esc(p.name)}</h2>`;
+    p.weeks.forEach((w,wi)=>{
+      h+=`<div class="mut" style="margin:6px 0 4px">${esc(w.name)}</div>`;
+      w.days.forEach((d,di)=>{
+        const tot=d.items.reduce((s,it)=>s+it.sets.length,0);
+        const done=d.items.reduce((s,it)=>s+it.sets.filter(x=>x.done).length,0);
+        h+=`<div class="card row between" onclick="openSession(${pi},${wi},${di})">
+          <div><div style="font-weight:600">${esc(d.name)}</div>
+          <div class="mut">${done}/${tot} séries faites</div></div>
+          <div class="bar" style="width:70px"><span style="width:${tot?done/tot*100:0}%"></span></div></div>`;
+      });
+    });
+  });
+  return h;
+}
+function viewSessionLog(){
+  const p=S.programs[sess.pi], w=p.weeks[sess.wi], d=w.days[sess.di];
+  let h=`<div class="crumb"><a onclick="sess.di=null;render()">‹ Séances</a></div>
+   <h1 style="margin:0 0 2px">${esc(d.name)}</h1>
+   <div class="mut mb">${esc(p.name)} · ${esc(w.name)}</div>`;
+  d.items.forEach((it,ei)=>{
+    const ex=exById(it.exId);
+    const cardio=ex&&ex.metric==="cardio";
+    h+=`<div class="card"><div class="row between mb">
+      <div style="font-weight:600">${esc(ex?ex.name:'?')}</div>
+      <div class="mut">cible</div></div>`;
+    h+= cardio
+      ? `<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`
+      : `<div class="setrow"><div></div><div class="lab">KG</div><div class="lab">REPS</div><div class="lab">RPE</div><div></div></div>`;
+    it.sets.forEach((set,si)=>{
+      if(cardio){
+        const target=`${fmt(set.dur)} min${set.dist!=null?' · '+fmt(set.dist)+' km':''}`;
+        h+=`<div class="setrow">
+          <div class="chk ${set.done?'on':''}" onclick="toggleDone(${ei},${si})">${set.done?'✓':''}</div>
+          <input inputmode="decimal" placeholder="${set.dur!=null?set.dur:'min'}" value="${set.aDur!=null?set.aDur:''}" data-k="log" data-f="aDur" data-ei="${ei}" data-si="${si}">
+          <input inputmode="decimal" placeholder="${set.dist!=null?set.dist:'km'}" value="${set.aDist!=null?set.aDist:''}" data-k="log" data-f="aDist" data-ei="${ei}" data-si="${si}">
+          <div></div><div></div>
+        </div><div class="mut" style="margin:-3px 0 8px 40px">cible ${target}</div>`;
+      }else{
+        const pl=plannedLoad(set,ex);
+        const target=`${pl?pl+'kg':'–'} × ${fmt(set.reps)} @${fmt(set.rpe)}`;
+        h+=`<div class="setrow">
+          <div class="chk ${set.done?'on':''}" onclick="toggleDone(${ei},${si})">${set.done?'✓':''}</div>
+          <input inputmode="decimal" placeholder="${pl||''}" value="${set.aLoad!=null?set.aLoad:''}" data-k="log" data-f="aLoad" data-ei="${ei}" data-si="${si}">
+          <input inputmode="numeric" placeholder="${set.reps!=null?set.reps:''}" value="${set.aReps!=null?set.aReps:''}" data-k="log" data-f="aReps" data-ei="${ei}" data-si="${si}">
+          <input inputmode="decimal" placeholder="${set.rpe!=null?set.rpe:''}" value="${set.aRpe!=null?set.aRpe:''}" data-k="log" data-f="aRpe" data-ei="${ei}" data-si="${si}">
+          <div></div>
+        </div><div class="mut" style="margin:-3px 0 8px 40px">cible ${target}${set.aLoad&&set.aReps?` · e1RM ${e1rm(set.aLoad,set.aReps)}`:''}</div>`;
+      }
+    });
+    h+=`</div>`;
+  });
+  h+=`<button class="full acc" onclick="finishSession()">Terminer & enregistrer</button>`;
+  return h;
+}
+
+/* ----- Stats ----- */
+function loggedSets(){
+  const out=[];
+  S.programs.forEach(p=>p.weeks.forEach((w,wi)=>w.days.forEach(d=>d.items.forEach(it=>it.sets.forEach(s=>{
+    if(s.done&&s.aLoad&&s.aReps) out.push({exId:it.exId,load:+s.aLoad,reps:+s.aReps,e1:e1rm(+s.aLoad,+s.aReps),pn:p.name,wn:w.name,wi,date:s.date});
+  })))));
+  return out;
+}
+function latestBW(){
+  if(!S.bodyweight||!S.bodyweight.length)return null;
+  const s=[...S.bodyweight].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  return s[s.length-1].kg;
+}
+function bestE1ByLift(lift){
+  const ids=S.exercises.filter(e=>e.lift===lift).map(e=>e.id);
+  let best=0;
+  loggedSets().forEach(s=>{if(ids.includes(s.exId)&&s.e1>best)best=s.e1;});
+  if(best)return best;
+  const refs=S.exercises.filter(e=>e.lift===lift&&e.orm>0).map(e=>e.orm);
+  return refs.length?Math.max(...refs):0;
+}
+function dotsCoef(bw,sex){
+  const c=sex==="F"
+    ?[-57.96288,13.6175032,-0.1126655495,0.0005158568,-0.0000010706]
+    :[-307.75076,24.0900756,-0.1918759221,0.0007391293,-0.000001093];
+  const d=c[0]+c[1]*bw+c[2]*bw*bw+c[3]*Math.pow(bw,3)+c[4]*Math.pow(bw,4);
+  return 500/d;
+}
+function dotsScore(){
+  const bw=latestBW();if(!bw)return null;
+  let total=0,have=0;
+  ["squat","bench","deadlift"].forEach(L=>{const b=bestE1ByLift(L);if(b){total+=b;have++;}});
+  if(!have)return null;
+  return {score:Math.round(dotsCoef(bw,S.settings.sex||"M")*total*10)/10,total:Math.round(total*10)/10,have,bw};
+}
+function prTimeline(){
+  const sets=loggedSets().filter(s=>s.date).sort((a,b)=>a.date.localeCompare(b.date));
+  const best={},prs=[];
+  sets.forEach(s=>{const b=best[s.exId]||0;if(s.e1>b){best[s.exId]=s.e1;prs.push({date:s.date,exId:s.exId,e1:s.e1});}});
+  return prs.reverse();
+}
+function viewStats(){
+  const ls=loggedSets();
+  const bw=latestBW();
+  let h=`<h1>Stats</h1>`;
+  // Bodyweight
+  h+=`<h2>Poids de corps</h2><div class="card">
+    <div class="row between mb">
+      <div><div class="stat">${bw!=null?fmt(bw):'–'} <span style="font-size:14px;color:var(--mut)">kg</span></div><div class="mut">dernier poids</div></div>
+      <div class="row" style="gap:6px;flex:none">
+        <input id="bwInput" inputmode="decimal" placeholder="kg" style="width:78px">
+        <button class="sm acc" onclick="addBW()">+</button>
+      </div>
+    </div>`;
+  if(S.bodyweight&&S.bodyweight.length>=2){
+    const bws=[...S.bodyweight].sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+    h+=lineSvg(bws.map(b=>b.kg));
+  }
+  h+=`</div>`;
+  if(!ls.length){
+    return h+`<div class="empty">Pas encore de séries enregistrées.<br>Logue une séance pour voir tes stats de force.</div>`;
+  }
+  // DOTS
+  const dt=dotsScore();
+  if(dt){
+    h+=`<h2>Score DOTS</h2><div class="card row between"><div>
+      <div class="stat">${dt.score}</div>
+      <div class="mut">Total S/B/D ${dt.total} kg · PdC ${dt.bw} kg${dt.have<3?` · ${dt.have}/3 mvts`:''}</div></div>
+      <div class="mut" style="text-align:right">${S.settings.sex==="F"?"Femme":"Homme"}</div></div>`;
+  }
+  // Records
+  h+=`<h2>Records (e1RM estimé)</h2>`;
+  const mains=S.exercises.filter(isMain);
+  let anyMain=false;
+  mains.forEach(ex=>{
+    const sets=ls.filter(s=>s.exId===ex.id);if(!sets.length)return;
+    anyMain=true;
+    const best=Math.max(...sets.map(s=>s.e1));
+    const rel=bw?Math.round(best/bw*100)/100:null;
+    h+=`<div class="card row between" onclick="openStatEx('${ex.id}')"><div><div class="mut">${esc(ex.name)}</div>
+      <div class="stat">${best} <span style="font-size:14px;color:var(--mut)">kg</span></div>
+      ${rel?`<div class="mut">${rel}× poids de corps</div>`:''}</div>
+      <div class="mut" style="text-align:right">1RM réf.<br>${ex.orm||'–'} kg ›</div></div>`;
+  });
+  if(!anyMain) h+=`<div class="mut mb">Marque tes mouvements principaux dans l'onglet Données pour voir tes records.</div>`;
+  // PR timeline
+  const prs=prTimeline().slice(0,12);
+  if(prs.length){
+    h+=`<h2>Records récents</h2><div class="card">`+prs.map(p=>{const ex=exById(p.exId);
+      return `<div class="row between mb"><div><span>${esc(ex?ex.name:'?')}</span> <span class="pill">${p.e1} kg</span></div><span class="mut">${p.date||''}</span></div>`;
+    }).join("")+`</div>`;
+  }
+  // Tonnage par semaine
+  h+=`<h2>Tonnage par semaine</h2>`;
+  const byw={};
+  ls.forEach(s=>{const k=s.pn+" · "+s.wn;byw[k]=(byw[k]||0)+s.load*s.reps;});
+  const keys=Object.keys(byw);
+  if(keys.length){
+    const max=Math.max(...keys.map(k=>byw[k]));
+    h+=`<div class="card">`+keys.map(k=>`
+      <div class="mb"><div class="row between"><span class="mut">${esc(k)}</span><span>${Math.round(byw[k])} kg</span></div>
+      <div class="bar"><span style="width:${byw[k]/max*100}%"></span></div></div>`).join("")+`</div>`;
+  }
+  // Progression e1RM par mouvement principal
+  h+=`<h2>Progression e1RM</h2>`;
+  mains.forEach(ex=>{
+    const sets=ls.filter(s=>s.exId===ex.id).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+    if(sets.length<2)return;
+    h+=`<div class="card"><div class="mut mb">${esc(ex.name)}</div>${lineSvg(sets.map(s=>s.e1))}</div>`;
+  });
+  // Historique par exercice
+  const ids=[...new Set(ls.map(s=>s.exId))];
+  if(ids.length){
+    h+=`<h2>Historique par exercice</h2>`+ids.map(id=>{const ex=exById(id);const c=ls.filter(s=>s.exId===id).length;
+      return `<div class="card row between" onclick="openStatEx('${id}')"><div style="font-weight:600">${esc(ex?ex.name:'?')}</div><div class="mut">${c} séries ›</div></div>`;
+    }).join("");
+  }
+  return h;
+}
+function viewStatEx(){
+  const ex=exById(statEx);
+  if(!ex){statEx=null;return viewStats();}
+  const sets=loggedSets().filter(s=>s.exId===statEx).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  let h=`<div class="crumb"><a onclick="statEx=null;render()">‹ Stats</a></div><h1 style="margin:0 0 10px">${esc(ex.name)}</h1>`;
+  if(!sets.length) return h+`<div class="empty">Aucune série enregistrée pour cet exercice.</div>`;
+  const best=Math.max(...sets.map(s=>s.e1));
+  h+=`<div class="card row between"><div><div class="mut">Meilleur e1RM</div><div class="stat">${best} <span style="font-size:14px;color:var(--mut)">kg</span></div></div>
+    <div style="text-align:right"><div class="mut">Séries</div><div class="stat">${sets.length}</div></div></div>`;
+  if(sets.length>=2) h+=`<div class="card"><div class="mut mb">Progression e1RM</div>${lineSvg(sets.map(s=>s.e1))}</div>`;
+  const byd={};sets.forEach(s=>{const k=s.date||"?";byd[k]=(byd[k]||0)+s.load*s.reps;});
+  const dks=Object.keys(byd).sort();
+  if(dks.length>=2) h+=`<div class="card"><div class="mut mb">Volume par date (kg)</div>${lineSvg(dks.map(k=>Math.round(byd[k])))}</div>`;
+  h+=`<h2>Détail des séries</h2><div class="card">`+sets.slice().reverse().map(s=>
+    `<div class="row between mb"><span>${fmt(s.load)} kg × ${fmt(s.reps)}</span><span class="mut">e1RM ${s.e1} · ${s.date||''}</span></div>`).join("")+`</div>`;
+  return h;
+}
+function lineSvg(vals){
+  const W=500,H=140,pad=24;
+  const mn=Math.min(...vals),mx=Math.max(...vals),rng=(mx-mn)||1;
+  const pts=vals.map((v,i)=>{
+    const x=pad+(vals.length===1?0:i/(vals.length-1)*(W-2*pad));
+    const y=H-pad-(v-mn)/rng*(H-2*pad);return[x,y];});
+  const path=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ');
+  const dots=pts.map(p=>`<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="var(--acc)"/>`).join('');
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="height:140px">
+    <text x="2" y="14" fill="#9aa3b2" font-size="11">${mx}</text>
+    <text x="2" y="${H-pad+12}" fill="#9aa3b2" font-size="11">${mn}</text>
+    <path d="${path}" fill="none" stroke="var(--acc)" stroke-width="2.5"/>${dots}</svg>`;
+}
+
+/* ----- Données ----- */
+function viewData(){
+  const c=Cloud;
+  let h=`<h1>Données & réglages</h1>`;
+  // Cloud
+  h+=`<h2>Synchronisation cloud</h2><div class="card">`;
+  if(!c.enabled()){
+    h+=`<div class="mut mb">Synchronise tes données entre téléphone et ordinateur via <b>jsonbin.io</b>. Crée un compte gratuit, ouvre <i>API Keys</i> et copie ta <b>Master Key</b> ci-dessous. Ta clé reste sur cet appareil (jamais publiée).</div>
+      <label class="fld">Master Key (X-Master-Key)</label>
+      <input id="ckey" type="password" placeholder="$2a$10$..." autocomplete="off" class="mb">
+      <button class="full acc mb" onclick="cloudCreateBin()">＋ Créer un bin & connecter</button>
+      <div class="mut mb" style="text-align:center">— ou bin déjà existant —</div>
+      <label class="fld">Bin ID</label>
+      <input id="cbin" placeholder="ex: 665f0a1e...c3" class="mb">
+      <button class="full gh" onclick="cloudUseExisting()">Connecter à ce bin</button>`;
+  }else{
+    h+=`<div class="row between mb"><span class="mut">État</span><span><span class="pill">${syncWord()}</span></span></div>
+      <div class="row between mb"><span class="mut">Bin</span><span class="pill">${esc(c.cfg.binId.slice(0,12))}…</span></div>
+      <div class="row between mb"><span class="mut">Dernière synchro</span><span>${c.cfg.lastSyncedAt?new Date(c.cfg.lastSyncedAt).toLocaleString('fr-FR'):'–'}</span></div>
+      <button class="full acc mb" onclick="Cloud.syncNow(true)">↻ Synchroniser maintenant</button>
+      <button class="full gh mb" onclick="cloudCopyBin()">Copier le Bin ID</button>
+      <button class="full danger" onclick="cloudDisconnect()">Déconnecter cet appareil</button>
+      <div class="mut" style="margin-top:8px">Sur ton autre appareil : entre la même Master Key et ce Bin ID.</div>`;
+  }
+  h+=`</div>`;
+  // Settings
+  h+=`<h2>Réglages</h2><div class="card">
+    <label class="fld">Sexe (pour le score DOTS)</label>
+    <select class="mb" onchange="S.settings.sex=this.value;persist();render()">
+      <option value="M" ${S.settings.sex!=="F"?"selected":""}>Homme</option>
+      <option value="F" ${S.settings.sex==="F"?"selected":""}>Femme</option>
+    </select>
+    <label class="fld">Arrondi des charges (kg)</label>
+    <select onchange="S.settings.round=+this.value;persist();toast('Enregistré')">
+      ${[1,2.5,5].map(r=>`<option value="${r}" ${S.settings.round===r?"selected":""}>${r} kg</option>`).join("")}
+    </select></div>`;
+  // Exercise library
+  h+=`<h2>Bibliothèque d'exercices</h2>`+S.exercises.map(ex=>exEditorCard(ex)).join("")+
+    `<button class="full gh mb" onclick="addEx()">+ Ajouter un exercice</button>`;
+  // Backup
+  h+=`<h2>Sauvegarde locale (fichier)</h2><div class="card">
+    <div class="mut mb">En plus du cloud, tu peux exporter/importer un fichier JSON.</div>
+    <button class="full acc mb" onclick="exportJson()">⬇︎ Exporter (JSON)</button>
+    <button class="full gh mb" onclick="$('#imp').click()">⬆︎ Importer un fichier</button>
+    <input id="imp" type="file" accept="application/json,.json" style="display:none" onchange="importJson(this)">
+    <button class="full danger" onclick="resetAll()">Réinitialiser tout</button></div>
+    <div class="mut" style="text-align:center;margin-top:18px">Ajoute cette page à l'écran d'accueil pour l'utiliser comme une app.</div>`;
+  return h;
+}
+function exEditorCard(ex){
+  const cats=["Principal","Haut du corps","Bas du corps","Cardio","Autre"];
+  const lifts=[["","–"],["squat","Squat"],["bench","Bench"],["deadlift","Deadlift"]];
+  return `<div class="card">
+    <input value="${esc(ex.name)}" data-k="exname" data-id="${ex.id}" class="mb">
+    <div class="grid3 mb">
+      <select onchange="setEx('${ex.id}','category',this.value)">${cats.map(c=>`<option ${ex.category===c?"selected":""}>${c}</option>`).join("")}</select>
+      <select onchange="setEx('${ex.id}','metric',this.value);render()">
+        <option value="weight" ${ex.metric!=="cardio"?"selected":""}>Charge×reps</option>
+        <option value="cardio" ${ex.metric==="cardio"?"selected":""}>Cardio</option>
+      </select>
+      <select onchange="setEx('${ex.id}','lift',this.value)" title="Mouvement de compét. (pour DOTS)">${lifts.map(([v,l])=>`<option value="${v}" ${(ex.lift||"")===v?"selected":""}>${l}</option>`).join("")}</select>
+    </div>
+    ${ex.metric!=="cardio"?`<div class="row mb"><span class="mut" style="min-width:64px">1RM réf.</span><input inputmode="decimal" value="${ex.orm||''}" placeholder="kg" data-k="orm" data-id="${ex.id}"></div>`:`<div class="mut mb">Exercice cardio (durée / distance).</div>`}
+    <button class="sm danger" onclick="delEx('${ex.id}')">Supprimer</button>
+  </div>`;
+}
+function syncWord(){const m={ok:"à jour",sync:"synchro…",err:"erreur",off:"hors-ligne",idle:"prêt"};return Cloud.dirty&&Cloud.status==="ok"?"à envoyer":(m[Cloud.status]||"prêt");}
+
+/* ---------- navigation ---------- */
+function crumb(parts,cur){
+  return `<div class="crumb">`+parts.map(([n,fn])=>{
+    crumb._h=crumb._h||{};const id="c"+uid();crumb._h[id]=fn;
+    return `<a onclick="crumb._h['${id}']();render()">${esc(n)}</a> ›`;
+  }).join(" ")+` <span>${esc(cur)}</span></div>`;
+}
+function openProg(i){nav.pi=i;render();}
+function openWeek(i){nav.wi=i;render();}
+function openDay(i){nav.di=i;render();}
+function openSession(pi,wi,di){sess={pi,wi,di};render();}
+function openStatEx(id){statEx=id;render();}
+
+/* ---------- builder mutations ---------- */
+function addProgram(){const n=prompt("Nom du programme","Bloc "+(S.programs.length+1));if(n){S.programs.push({id:uid(),name:n,weeks:[]});persist();render();}}
+function renameProg(){const p=S.programs[nav.pi];const n=prompt("Nom",p.name);if(n){p.name=n;persist();render();}}
+function delProgram(){if(confirm("Supprimer ce programme ?")){S.programs.splice(nav.pi,1);nav.pi=null;persist();render();}}
+function addWeek(){const p=S.programs[nav.pi];p.weeks.push({id:uid(),name:"Semaine "+(p.weeks.length+1),days:[]});persist();render();}
+function renameWeek(){const w=S.programs[nav.pi].weeks[nav.wi];const n=prompt("Nom",w.name);if(n){w.name=n;persist();render();}}
+function delWeek(){if(confirm("Supprimer cette semaine ?")){S.programs[nav.pi].weeks.splice(nav.wi,1);nav.wi=null;persist();render();}}
+function dupWeek(){const p=S.programs[nav.pi];const w=p.weeks[nav.wi];
+  const copy=JSON.parse(JSON.stringify(w));copy.id=uid();copy.name=w.name+" (copie)";
+  copy.days.forEach(d=>{d.id=uid();d.items.forEach(it=>{it.id=uid();it.sets.forEach(s=>{s.id=uid();s.aLoad=s.aReps=s.aRpe=s.aDur=s.aDist=null;s.done=false;s.date=null;});});});
+  p.weeks.splice(nav.wi+1,0,copy);persist();toast("Semaine dupliquée");render();}
+function addDay(){const w=S.programs[nav.pi].weeks[nav.wi];
+  const n=prompt("Nom de la séance","Séance "+String.fromCharCode(65+w.days.length));
+  if(n){w.days.push({id:uid(),name:n,items:[]});persist();render();}}
+function renameDay(){const d=S.programs[nav.pi].weeks[nav.wi].days[nav.di];const n=prompt("Nom",d.name);if(n){d.name=n;persist();render();}}
+function delDay(){if(confirm("Supprimer cette séance ?")){S.programs[nav.pi].weeks[nav.wi].days.splice(nav.di,1);nav.di=null;persist();render();}}
+function curDay(){return S.programs[nav.pi].weeks[nav.wi].days[nav.di];}
+function addItem(){
+  const names=S.exercises.map((e,i)=>`${i+1}. ${e.name}`).join("\n");
+  const r=prompt("Quel exercice ? Tape le numéro, ou un nouveau nom :\n"+names);
+  if(!r)return;
+  let ex;const idx=parseInt(r,10);
+  if(!isNaN(idx)&&idx>=1&&idx<=S.exercises.length) ex=S.exercises[idx-1];
+  else{ex={id:uid(),name:r.trim(),category:"Autre",metric:"weight",lift:null,orm:0};S.exercises.push(ex);}
+  const first=ex.metric==="cardio"?mkcardio(20,null):{id:uid(),pct:ex.orm>0?75:null,load:null,reps:5,rpe:8,aLoad:null,aReps:null,aRpe:null,done:false,date:null};
+  curDay().items.push({id:uid(),exId:ex.id,sets:[first]});
+  persist();render();
+}
+function delItem(ei){curDay().items.splice(ei,1);persist();render();}
+function addSet(ei){const it=curDay().items[ei];const ex=exById(it.exId);const last=it.sets[it.sets.length-1];
+  if(ex&&ex.metric==="cardio") it.sets.push(last?{...last,id:uid(),aDur:null,aDist:null,done:false,date:null}:mkcardio(20,null));
+  else it.sets.push(last?{...last,id:uid(),aLoad:null,aReps:null,aRpe:null,done:false,date:null}:mkset(75,5,8));
+  persist();render();}
+function delSet(ei,si){const it=curDay().items[ei];it.sets.splice(si,1);persist();render();}
+
+/* ---------- logging mutations ---------- */
+function sessDay(){return S.programs[sess.pi].weeks[sess.wi].days[sess.di];}
+function toggleDone(ei,si){const it=sessDay().items[ei];const set=it.sets[si];const ex=exById(it.exId);
+  set.done=!set.done;
+  if(set.done){
+    if(ex&&ex.metric==="cardio"){
+      if(set.aDur==null&&set.dur!=null)set.aDur=set.dur;
+      if(set.aDist==null&&set.dist!=null)set.aDist=set.dist;
+    }else{
+      if(set.aLoad==null){const pl=plannedLoad(set,ex);if(pl)set.aLoad=pl;}
+      if(set.aReps==null&&set.reps!=null)set.aReps=set.reps;
+      if(set.aRpe==null&&set.rpe!=null)set.aRpe=set.rpe;
+    }
+    set.date=today();
+  }
+  persist();render();}
+function finishSession(){
+  const d=sessDay();let n=0;
+  d.items.forEach(it=>it.sets.forEach(s=>{if(s.done){n++;if(!s.date)s.date=today();}}));
+  persist();toast(n+" séries enregistrées");sess.di=null;render();
+}
+
+/* ---------- bodyweight ---------- */
+function addBW(){const el=$("#bwInput");if(!el)return;const v=el.value.trim().replace(",",".");const kg=+v;
+  if(!v||isNaN(kg)||kg<=0){toast("Poids invalide");return;}
+  const d=today();const ex=S.bodyweight.find(b=>b.date===d);
+  if(ex)ex.kg=kg;else S.bodyweight.push({id:uid(),date:d,kg});
+  persist();render();toast("Poids enregistré");}
+
+/* ---------- inputs (delegation) ---------- */
+document.addEventListener("input",e=>{
+  const t=e.target;if(t.tagName!=="INPUT")return;
+  const k=t.dataset.k;if(!k)return;
+  const v=t.value.trim();
+  const num=()=>v===""?null:+v.replace(",",".");
+  if(k==="plan"){
+    const set=curDay().items[+t.dataset.ei].sets[+t.dataset.si];const f=t.dataset.f;
+    if(f==="pct"){set.pct=num();set.load=null;}
+    else if(f==="load"){set.load=num();set.pct=null;}
+    else set[f]=num();
+    persist();
+  }else if(k==="log"){
+    const set=sessDay().items[+t.dataset.ei].sets[+t.dataset.si];
+    set[t.dataset.f]=num();persist();
+  }else if(k==="orm"){
+    const ex=exById(t.dataset.id);ex.orm=v===""?0:+v.replace(",",".");persist();
+  }else if(k==="exname"){
+    const ex=exById(t.dataset.id);if(ex)ex.name=v;persist();
+  }
+});
+
+/* ---------- exercises / data ---------- */
+function setEx(id,f,v){const ex=exById(id);if(!ex)return;ex[f]=(f==="lift"&&v==="")?null:v;persist();}
+function addEx(){const n=prompt("Nom de l'exercice");if(!n)return;
+  S.exercises.push({id:uid(),name:n.trim(),category:"Autre",metric:"weight",lift:null,orm:0});persist();render();}
+function delEx(id){if(confirm("Supprimer cet exercice de la bibliothèque ?")){
+  S.exercises=S.exercises.filter(e=>e.id!==id);persist();render();}}
+function exportJson(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(blob);
+  a.download="suivi_muscu_"+today()+".json";a.click();
+}
+function importJson(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{const o=JSON.parse(r.result);if(!o.exercises)throw 0;S=migrate(o);persist();toast("Importé");render();}
+  catch(e){alert("Fichier invalide");}};r.readAsText(f);}
+function resetAll(){if(confirm("Tout effacer et repartir de l'exemple ?")){S=seed();persist();render();}}
+
+/* ---------- cloud connect UI ---------- */
+async function cloudCreateBin(){
+  const key=($("#ckey")||{}).value?$("#ckey").value.trim():"";
+  if(!key){alert("Entre ta Master Key");return;}
+  Cloud.cfg.key=key;Cloud.setStatus("sync","Création…");
+  try{
+    const id=await Cloud.apiCreate();
+    Cloud.cfg.binId=id;Cloud.cfg.lastSyncedAt=S.updatedAt;Cloud.dirty=false;Cloud.saveCfg();
+    Cloud.setStatus("ok");toast("Connecté ✓");render();
+  }catch(e){Cloud.cfg.key="";Cloud.setStatus("idle");alert("Échec : "+e.message+"\nVérifie ta Master Key.");}
+}
+async function cloudUseExisting(){
+  const key=($("#ckey")||{}).value?$("#ckey").value.trim():"";
+  const id=($("#cbin")||{}).value?$("#cbin").value.trim():"";
+  if(!key||!id){alert("Master Key et Bin ID requis");return;}
+  Cloud.cfg.key=key;Cloud.cfg.binId=id;Cloud.cfg.lastSyncedAt=null;Cloud.saveCfg();
+  Cloud.setStatus("sync","Connexion…");
+  try{
+    const cloud=await Cloud.apiGet();
+    if(cloud&&cloud.exercises){adoptCloud(cloud);toast("Connecté ✓");}
+    else{Cloud.dirty=true;await Cloud.push();toast("Connecté ✓");}
+    render();
+  }catch(e){Cloud.cfg={binId:"",key:"",lastSyncedAt:null};Cloud.saveCfg();Cloud.setStatus("idle");alert("Échec : "+e.message+"\nVérifie la clé et le Bin ID.");render();}
+}
+function cloudCopyBin(){const t=Cloud.cfg.binId;if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>toast("Bin ID copié"),()=>prompt("Bin ID",t));else prompt("Bin ID",t);}
+function cloudDisconnect(){if(confirm("Déconnecter le cloud sur cet appareil ? (les données locales restent)")){
+  Cloud.cfg={binId:"",key:"",lastSyncedAt:null};Cloud.dirty=false;Cloud.saveCfg();Cloud.setStatus("idle");render();}}
+
+/* ---------- boot ---------- */
+Cloud.loadCfg();
+$("#sync").onclick=()=>{if(Cloud.enabled())Cloud.syncNow(true);else go("data");};
+render();
+if(Cloud.enabled())Cloud.pull();
+window.addEventListener("online",()=>{renderSync();if(Cloud.enabled()&&!Cloud.dirty)Cloud.pull();});
+window.addEventListener("offline",()=>Cloud.setStatus("off"));
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&Cloud.enabled()&&!Cloud.dirty)Cloud.pull();});
+if("serviceWorker" in navigator && location.protocol!=="file:") window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+</script>
+</body>
+</html>
