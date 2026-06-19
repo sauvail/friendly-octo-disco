@@ -160,6 +160,7 @@ label.fld{display:block;font-size:12px;color:var(--mut);margin:0 0 4px}
 <div class="toast" id="toast"></div>
 <div class="dropline" id="dropline"></div>
 <div class="snackbar" id="snack"><span id="snackmsg"></span><button id="snackbtn">Annuler</button></div>
+<div class="snackbar" id="updbar" style="bottom:calc(144px + env(safe-area-inset-bottom))"><span>Nouvelle version disponible</span><button id="updbtn">Recharger</button></div>
 <div class="resttimer" id="rest"><button onclick="restAdd(-15)">−15s</button><span class="rt-time" id="restTime">0:00</span><button onclick="restAdd(15)">+15s</button><button onclick="restSkip()">Passer ✓</button></div>
 <div id="modalRoot"></div>
 <script>
@@ -1196,10 +1197,9 @@ if("serviceWorker" in navigator && location.protocol!=="file:") window.addEventL
   navigator.serviceWorker.addEventListener("controllerchange",()=>{if(reloaded)return;reloaded=true;location.reload();});
 });
 function showUpdate(reg){
-  const s=$("#snack"),btn=$("#snackbtn");
-  $("#snackmsg").textContent="Nouvelle version disponible";btn.textContent="Recharger";
-  clearTimeout(undoTimer);s.classList.add("show");
-  btn.onclick=()=>{if(reg.waiting)reg.waiting.postMessage({type:"skipWaiting"});};
+  const s=$("#updbar");if(!s)return;
+  s.classList.add("show");
+  $("#updbtn").onclick=()=>{if(reg.waiting)reg.waiting.postMessage({type:"skipWaiting"});};
 }
 </script>
 </body>
