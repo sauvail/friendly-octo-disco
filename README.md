@@ -8,12 +8,12 @@ Live app (GitHub Pages): **https://sauvail.github.io/friendly-octo-disco/**
 
 ## Features
 
-- **Programmes** — build blocs → semaines → séances → exercices → séries, planned as `%1RM` or absolute load, with reps & RPE.
-- **Séance** — log what you actually lifted; check off sets; auto-fills planned values.
-- **Stats** — bodyweight chart, estimated 1RM records, DOTS score, recent PRs, weekly tonnage, e1RM progression, per-exercise history.
-- **Cloud sync** — auto pull on open + auto push after edits (last-write-wins), with a manual *Sync now* and a status indicator. Works fully offline; syncs when back online.
-- **Installable PWA** — "Add to Home Screen" for an app-like, offline-capable experience.
-- **Local backup** — JSON export/import, independent of the cloud.
+- **Programme (kanban)** — build blocs → semaines → séances → exercices on a **drag-and-drop board** (collapsible week sections, workout cards). Plan sets as `%1RM` or absolute load with reps & RPE. **Supersets** (link exercises A1/A2), **"bloc suivant"** auto-progression (+kg on reference 1RMs), and in-app rename/duplicate/delete with **undo**.
+- **Run a workout** — start a séance from its card and log with **± steppers**, a **plate calculator** (per side, configurable bar), a **rest timer** (vibrate + beep, screen stays awake), and a **"last time"** reference showing your previous session for each lift.
+- **Stats** — bodyweight, **DOTS & Wilks**, estimated-1RM records + relative strength, recent PRs, weekly tonnage, **volume by category**, **date-accurate** e1RM/volume charts, a **12-week consistency calendar**, per-exercise history, and **CSV export**.
+- **Cloud sync (jsonbin.io)** — auto pull on open + debounced push (last-write-wins with conflict prompt), manual *Sync now*, **Master *or* Access key**, and **version history / restore**. Fully offline; syncs when back online.
+- **Installable PWA** — "Add to Home Screen", offline app shell, and a **"new version available — reload"** prompt after each deploy.
+- **Backups** — JSON export/import **and CSV export**, independent of the cloud.
 
 All data lives in your browser's `localStorage` and (optionally) in your own jsonbin bin.
 Your jsonbin key is stored **only on each device** and is never committed to this repo.
@@ -29,8 +29,7 @@ Your jsonbin key is stored **only on each device** and is never committed to thi
 
 That's it — edits on one device now appear on the other. Tap the status pill (top-right) any time to force a sync.
 
-> Tip: in jsonbin you can instead create a scoped **Access Key** if you prefer not to put your Master Key on a device.
-> Keep the bin **private**.
+> Tip: in the app (Données → Type de clé) you can choose **Master Key** or a scoped **Access Key** (read + update) — the Access Key avoids putting your all-powerful Master Key on a device. Keep the bin **private**. Creating a new bin requires a Master Key (or an Access Key with `create` permission).
 
 ## Install on your phone / computer
 
