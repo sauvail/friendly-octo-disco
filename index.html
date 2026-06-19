@@ -151,6 +151,10 @@ label.fld{display:block;font-size:12px;color:var(--mut);margin:0 0 4px}
 .mods{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
 .modchip{font-size:12px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:3px 9px;color:var(--mut);display:inline-flex;gap:6px;align-items:center}
 .modchip b{color:var(--red);cursor:pointer;font-weight:400}
+.editcols{display:flex;gap:12px;overflow-x:auto;width:100vw;margin-left:calc(50% - 50vw);padding:0 14px 14px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.editcol{flex:0 0 86vw;max-width:340px;scroll-snap-align:start;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px}
+@media(min-width:560px){.editcol{flex:0 0 320px}}
+.runbtn2{background:var(--acc);color:#fff;border:none;border-radius:9px;min-height:0;padding:7px 11px;font-size:14px}
 </style>
 </head>
 <body>
@@ -280,6 +284,7 @@ let curPi=0;              // selected program
 let edit=null;            // {wi,di} workout being edited
 let running=null;         // {wi,di} workout being run/logged
 let statEx=null;          // stats per-exercise detail
+let editAll=false;        // multi-column "edit all séances" view
 const COLL=new Set();     // collapsed week ids (ephemeral)
 
 function load(){
@@ -358,6 +363,7 @@ const fmt=v=>v==null||v===""?"–":(""+v).replace(/\.0$/,"");
 const isMain=ex=>ex&&ex.category==="Principal";
 const curP=()=>S.programs[curPi];
 const edWorkout=()=>S.programs[curPi].weeks[edit.wi].days[edit.di];
+const wk=(wi,di)=>S.programs[curPi].weeks[wi].days[di];
 const runWorkout=()=>S.programs[curPi].weeks[running.wi].days[running.di];
 const setProgress=d=>{const tot=d.items.reduce((s,it)=>s+it.sets.length,0);const done=d.items.reduce((s,it)=>s+it.sets.filter(x=>x.done).length,0);return{tot,done};};
 const MUSCLES=["Pectoraux","Dos","Épaules","Biceps","Triceps","Avant-bras","Quadriceps","Ischios","Fessiers","Mollets","Abdos","Lombaires","Trapèzes"];
@@ -468,7 +474,7 @@ function renderSync(){
 function render(){
   renderNav();
   const a=$("#app");
-  if(view==="prog") a.innerHTML = running?viewRun() : edit?viewEditor() : viewBoard();
+  if(view==="prog") a.innerHTML = running?viewRun() : editAll?viewEditAll() : edit?viewEditor() : viewBoard();
   else if(view==="stats") a.innerHTML = statEx?viewStatEx():viewStats();
   else a.innerHTML = viewData();
   renderSync();
@@ -477,7 +483,7 @@ function renderNav(){
   const items=[["prog","🗓️","Programme"],["stats","📈","Stats"],["data","⚙️","Données"]];
   $("#nav").innerHTML=items.map(([k,i,l])=>`<button class="${view===k?'on':''}" onclick="go('${k}')"><span class="ic">${i}</span>${l}</button>`).join("");
 }
-function go(v){view=v;edit=null;running=null;statEx=null;closeMenu();wakeOff();restSkip();scrollTop();render();}
+function go(v){view=v;edit=null;running=null;editAll=false;statEx=null;closeMenu();wakeOff();restSkip();scrollTop();render();}
 
 /* ===================== PROGRAM BOARD (kanban) ===================== */
 function viewBoard(){
@@ -490,6 +496,7 @@ function viewBoard(){
     `<button class="chip add" onclick="addProgram()">＋</button></div>
     <div class="row between mb"><h1 style="margin:0">${esc(p.name)}</h1>
       <button class="iconbtn" onclick="progMenu(event)">⋯</button></div>`;
+  if(p.weeks.some(w=>w.days.length)) h+=`<button class="full gh mb" onclick="openEditAll()">✎ Tout éditer les séances</button>`;
   if(!p.weeks.length){
     h+=`<div class="empty">Aucune semaine.<br><br><button class="acc" onclick="addWeek()">＋ Semaine</button></div>`;
     return h;
@@ -530,31 +537,27 @@ function viewBoard(){
 }
 
 /* ----- workout editor (plan) ----- */
-function viewEditor(){
-  const p=curP(),w=p.weeks[edit.wi],d=w.days[edit.di];
-  let h=`<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a> › ${esc(w.name)}</div>
-    <div class="row between"><h1 style="margin:0">${esc(d.name)}</h1>
-      <button class="iconbtn" onclick="workoutMenu(event)">⋯</button></div>
-    <button class="full acc mb" onclick="openRun(${edit.wi},${edit.di})">▶ Démarrer la séance</button>
-    <div class="mut mb">Plan : charge (kg), reps, RPE. Le logging se fait au démarrage.</div>`;
-  if(!d.items.length) h+=`<div class="empty">Aucun exercice.</div>`;
+function itemsEditorHtml(wi,di,withDrag){
+  const d=wk(wi,di);
   const gl=groupLabels(d.items);
+  let h="";
+  if(!d.items.length) h+=`<div class="empty" style="padding:18px 8px">Aucun exercice.</div>`;
   d.items.forEach((it,ei)=>{
     const ex=exById(it.exId);
     const wild=!ex&&it.muscle;
     const cardio=ex&&ex.metric==="cardio";
     const tagCls=isMain(ex)?"main":cardio?"cardio":"";
     const g=gl[ei];
-    h+=`<div class="card ${g?'ssitem':''}" data-drag="ex" data-ei="${ei}"><div class="row between mb">
+    h+=`<div class="card ${g?'ssitem':''}" ${withDrag?`data-drag="ex" data-ei="${ei}"`:""}><div class="row between mb">
       <div class="row" style="gap:6px;min-width:0">
-        <span class="grip" onpointerdown="dragStart(event,'ex',${ei},0)">⋮⋮</span>
+        ${withDrag?`<span class="grip" onpointerdown="dragStart(event,'ex',${ei},0)">⋮⋮</span>`:""}
         ${g?`<span class="sslabel">${g.letter}${g.n}</span>`:''}
         <span style="font-weight:600">${esc(itemName(it))}</span>
         <span class="tag ${wild?'':tagCls}">${wild?'joker':(ex?esc(ex.category):'')}</span></div>
       <div class="row" style="gap:6px;flex:none">
-        <button class="sm gh" onclick="toggleGroup(${ei})">${g?'⛓ délier':'⛓ lier'}</button>
-        <button class="sm danger" onclick="delItem(${ei})">✕</button></div></div>`;
-    h+=`${(it.mods&&it.mods.length)?`<div class="mods">`+it.mods.map((m,mi)=>`<span class="modchip">${esc(modText(m))} <b onclick="delMod(${ei},${mi})">✕</b></span>`).join("")+`</div>`:''}<button class="full sm gh mb" onclick="addMod(${ei})">+ modificateur</button>`;
+        <button class="sm gh" onclick="toggleGroup(${wi},${di},${ei})">${g?'⛓ délier':'⛓ lier'}</button>
+        <button class="sm danger" onclick="delItem(${wi},${di},${ei})">✕</button></div></div>`;
+    h+=`${(it.mods&&it.mods.length)?`<div class="mods">`+it.mods.map((m,mi)=>`<span class="modchip">${esc(modText(m))} <b onclick="delMod(${wi},${di},${ei},${mi})">✕</b></span>`).join("")+`</div>`:''}<button class="full sm gh mb" onclick="addMod(${wi},${di},${ei})">+ modificateur</button>`;
     h+= cardio
       ? `<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`
       : `<div class="setrow"><div></div><div class="lab">KG</div><div class="lab">REPS</div><div class="lab">RPE</div><div></div></div>`;
@@ -562,24 +565,48 @@ function viewEditor(){
       if(cardio){
         h+=`<div class="setrow">
           <div class="lab" style="text-align:center">${si+1}</div>
-          <input inputmode="decimal" placeholder="min" value="${set.dur!=null?set.dur:''}" data-k="plan" data-f="dur" data-ei="${ei}" data-si="${si}">
-          <input inputmode="decimal" placeholder="km" value="${set.dist!=null?set.dist:''}" data-k="plan" data-f="dist" data-ei="${ei}" data-si="${si}">
+          <input inputmode="decimal" placeholder="min" value="${set.dur!=null?set.dur:''}" data-k="plan" data-f="dur" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
+          <input inputmode="decimal" placeholder="km" value="${set.dist!=null?set.dist:''}" data-k="plan" data-f="dist" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
           <div></div>
-          <button class="sm danger" onclick="delSet(${ei},${si})">✕</button></div>`;
+          <button class="sm danger" onclick="delSet(${wi},${di},${ei},${si})">✕</button></div>`;
       }else{
         h+=`<div class="setrow">
           <div class="lab" style="text-align:center">${si+1}</div>
-          <input inputmode="decimal" placeholder="kg" value="${set.load!=null?set.load:''}" data-k="plan" data-f="load" data-ei="${ei}" data-si="${si}">
-          <input inputmode="numeric" placeholder="reps" value="${set.reps!=null?set.reps:''}" data-k="plan" data-f="reps" data-ei="${ei}" data-si="${si}">
-          <input inputmode="decimal" placeholder="rpe" value="${set.rpe!=null?set.rpe:''}" data-k="plan" data-f="rpe" data-ei="${ei}" data-si="${si}">
-          <button class="sm danger" onclick="delSet(${ei},${si})">✕</button>
+          <input inputmode="decimal" placeholder="kg" value="${set.load!=null?set.load:''}" data-k="plan" data-f="load" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
+          <input inputmode="numeric" placeholder="reps" value="${set.reps!=null?set.reps:''}" data-k="plan" data-f="reps" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
+          <input inputmode="decimal" placeholder="rpe" value="${set.rpe!=null?set.rpe:''}" data-k="plan" data-f="rpe" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
+          <button class="sm danger" onclick="delSet(${wi},${di},${ei},${si})">✕</button>
         </div>`;
       }
     });
-    h+=`<button class="full sm gh" onclick="addSet(${ei})">+ série</button></div>`;
+    h+=`<button class="full sm gh" onclick="addSet(${wi},${di},${ei})">+ série</button></div>`;
   });
-  h+=`<button class="full gh mb" onclick="addItem()">＋ Exercice</button>`;
+  h+=`<button class="full gh" onclick="addItem(${wi},${di})">＋ Exercice</button>`;
   return h;
+}
+function viewEditor(){
+  const p=curP(),w=p.weeks[edit.wi],d=w.days[edit.di];
+  return `<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a> › ${esc(w.name)}</div>
+    <div class="row between"><h1 style="margin:0">${esc(d.name)}</h1>
+      <button class="iconbtn" onclick="workoutMenu(event,${edit.wi},${edit.di})">⋯</button></div>
+    <button class="full acc mb" onclick="openRun(${edit.wi},${edit.di})">▶ Démarrer la séance</button>
+    <div class="mut mb">Plan : charge (kg), reps, RPE. Le logging se fait au démarrage.</div>`+
+    itemsEditorHtml(edit.wi,edit.di,true);
+}
+function viewEditAll(){
+  const p=curP();
+  let cols="";
+  p.weeks.forEach((w,wi)=>w.days.forEach((d,di)=>{
+    cols+=`<div class="editcol">
+      <div class="row between mb" style="gap:6px;align-items:flex-start">
+        <div style="min-width:0"><div class="mut">${esc(w.name)}</div><div style="font-weight:700;font-size:16px">${esc(d.name)}</div></div>
+        <div class="row" style="gap:4px;flex:none"><button class="runbtn2" onclick="openRun(${wi},${di})">▶</button><button class="iconbtn" onclick="workoutMenu(event,${wi},${di})">⋯</button></div>
+      </div>`+itemsEditorHtml(wi,di,false)+`</div>`;
+  }));
+  return `<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a></div>
+    <div class="row between"><h1 style="margin:0">Tout éditer</h1><span class="mut">${esc(p.name)}</span></div>
+    <div class="mut mb">Toutes les séances — fais défiler horizontalement →</div>`+
+    (cols?`<div class="editcols">${cols}</div>`:`<div class="empty">Aucune séance. Ajoute-en depuis le tableau.</div>`);
 }
 
 /* ----- in-workout helpers: plates, last-time, rest timer, wake lock ----- */
@@ -684,10 +711,11 @@ function viewRun(){
 }
 
 /* ----- board navigation ----- */
-function selProg(i){curPi=i;edit=null;running=null;closeMenu();scrollTop();render();}
-function openEditor(wi,di){edit={wi,di};running=null;closeMenu();scrollTop();render();}
-function openRun(wi,di){running={wi,di};edit=null;closeMenu();wakeOn();scrollTop();render();}
-function backToBoard(){edit=null;running=null;wakeOff();restSkip();scrollTop();render();}
+function selProg(i){curPi=i;edit=null;running=null;editAll=false;closeMenu();scrollTop();render();}
+function openEditor(wi,di){edit={wi,di};running=null;editAll=false;closeMenu();scrollTop();render();}
+function openEditAll(){editAll=true;edit=null;running=null;closeMenu();scrollTop();render();}
+function openRun(wi,di){running={wi,di};edit=null;editAll=false;closeMenu();wakeOn();scrollTop();render();}
+function backToBoard(){edit=null;running=null;editAll=false;wakeOff();restSkip();scrollTop();render();}
 function toggleColl(id){COLL.has(id)?COLL.delete(id):COLL.add(id);render();}
 
 /* ----- popover menus ----- */
@@ -715,10 +743,10 @@ function weekMenu(ev,wi){popMenu(ev,[
   ["Dupliquer",()=>dupWeek(wi)],
   ["Supprimer",()=>delWeek(wi),true]
 ]);}
-function workoutMenu(ev){popMenu(ev,[
-  ["Renommer",renameWorkout],
-  ["Dupliquer",dupWorkout],
-  ["Supprimer",delWorkout,true]
+function workoutMenu(ev,wi,di){popMenu(ev,[
+  ["Renommer",()=>renameWorkout(wi,di)],
+  ["Dupliquer",()=>dupWorkout(wi,di)],
+  ["Supprimer",()=>delWorkout(wi,di),true]
 ]);}
 
 /* ----- program / week / workout mutations ----- */
@@ -744,15 +772,15 @@ function dupWeek(wi){const w=curP().weeks[wi];const c=JSON.parse(JSON.stringify(
 function delWeek(wi){snapshot("Semaine supprimée");curP().weeks.splice(wi,1);persist();render();}
 async function addWorkout(wi){const w=curP().weeks[wi];const n=await modalPrompt("Nom de la séance","Séance "+String.fromCharCode(65+w.days.length));
   if(n){w.days.push({id:uid(),name:n,items:[]});persist();render();}}
-async function renameWorkout(){const d=edWorkout();const n=await modalPrompt("Renommer la séance",d.name);if(n){d.name=n;persist();render();}}
-function dupWorkout(){const w=curP().weeks[edit.wi];const c=JSON.parse(JSON.stringify(w.days[edit.di]));reId(c);c.name=c.name+" (copie)";
-  c.items.forEach(it=>{if(it.muscle)it.exId=null;it.sets.forEach(resetLog);});w.days.splice(edit.di+1,0,c);edit={wi:edit.wi,di:edit.di+1};persist();toast("Séance dupliquée");render();}
-function delWorkout(){snapshot("Séance supprimée");curP().weeks[edit.wi].days.splice(edit.di,1);edit=null;persist();scrollTop();render();}
+async function renameWorkout(wi,di){const d=wk(wi,di);const n=await modalPrompt("Renommer la séance",d.name);if(n){d.name=n;persist();render();}}
+function dupWorkout(wi,di){const w=curP().weeks[wi];const c=JSON.parse(JSON.stringify(w.days[di]));reId(c);c.name=c.name+" (copie)";
+  c.items.forEach(it=>{if(it.muscle)it.exId=null;it.sets.forEach(resetLog);});w.days.splice(di+1,0,c);persist();toast("Séance dupliquée");render();}
+function delWorkout(wi,di){snapshot("Séance supprimée");curP().weeks[wi].days.splice(di,1);if(edit&&edit.wi===wi&&edit.di===di)edit=null;persist();scrollTop();render();}
 function reId(o){if(o&&typeof o==="object"){if("id" in o)o.id=uid();for(const k in o){const v=o[k];if(Array.isArray(v))v.forEach(reId);else if(v&&typeof v==="object")reId(v);}}return o;}
 function resetLog(s){s.aLoad=s.aReps=s.aRpe=s.aDur=s.aDist=null;s.done=false;s.date=null;}
 
 /* ----- exercise (in editor) mutations ----- */
-async function addItem(){
+async function addItem(wi,di){
   const items=[
     ...MUSCLES.map(mu=>({label:"💪 "+mu,sub:"muscle / joker",value:"m:"+mu})),
     ...S.exercises.map(e=>({label:e.name,sub:e.muscle||e.category,value:e.id}))
@@ -760,7 +788,7 @@ async function addItem(){
   const v=await modalChoose("Ajouter un exercice ou un muscle",items,{search:true,newLabel:"＋ Nouvel exercice"});
   if(v==null)return;
   if(typeof v==="string"&&v.slice(0,2)==="m:"){
-    edWorkout().items.push({id:uid(),exId:null,muscle:v.slice(2),sets:[mkset(null,12,8)]});
+    wk(wi,di).items.push({id:uid(),exId:null,muscle:v.slice(2),sets:[mkset(null,12,8)]});
     persist();render();return;
   }
   let ex;
@@ -769,15 +797,15 @@ async function addItem(){
     ex={id:uid(),name:name.trim(),category:"Autre",metric:"weight",lift:null,orm:0};S.exercises.push(ex);
   }else{ex=exById(v);if(!ex)return;}
   const first=ex.metric==="cardio"?mkcardio(20,null):mkset(null,5,8);
-  edWorkout().items.push({id:uid(),exId:ex.id,sets:[first]});
+  wk(wi,di).items.push({id:uid(),exId:ex.id,sets:[first]});
   persist();render();
 }
-function delItem(ei){snapshot("Exercice retiré");edWorkout().items.splice(ei,1);persist();render();}
-function addSet(ei){const it=edWorkout().items[ei];const ex=exById(it.exId);const last=it.sets[it.sets.length-1];
+function delItem(wi,di,ei){snapshot("Exercice retiré");wk(wi,di).items.splice(ei,1);persist();render();}
+function addSet(wi,di,ei){const it=wk(wi,di).items[ei];const ex=exById(it.exId);const last=it.sets[it.sets.length-1];
   if(ex&&ex.metric==="cardio") it.sets.push(last?{...last,id:uid(),aDur:null,aDist:null,done:false,date:null}:mkcardio(20,null));
   else it.sets.push(last?{...last,id:uid(),aLoad:null,aReps:null,aRpe:null,done:false,date:null}:mkset(null,5,8));
   persist();render();}
-function delSet(ei,si){snapshot("Série retirée");const it=edWorkout().items[ei];it.sets.splice(si,1);persist();render();}
+function delSet(wi,di,ei,si){snapshot("Série retirée");const it=wk(wi,di).items[ei];it.sets.splice(si,1);persist();render();}
 /* ----- supersets ----- */
 function groupLabels(items){
   const ids=[],res={},counts={};
@@ -785,23 +813,23 @@ function groupLabels(items){
   items.forEach((it,i)=>{if(it.group){counts[it.group]=(counts[it.group]||0)+1;res[i]={letter:String.fromCharCode(65+ids.indexOf(it.group)),n:counts[it.group]};}});
   return res;
 }
-function groupWithNext(ei){const items=edWorkout().items;if(ei>=items.length-1){toast("Ajoute un exercice après pour le lier");return;}const a=items[ei],b=items[ei+1];const id=a.group||b.group||uid();a.group=id;b.group=id;persist();render();}
-function ungroupItem(ei){const items=edWorkout().items;const it=items[ei];const id=it.group;delete it.group;const rem=items.filter(x=>x.group===id);if(rem.length<2)rem.forEach(x=>delete x.group);persist();render();}
-function toggleGroup(ei){const it=edWorkout().items[ei];if(it.group)ungroupItem(ei);else groupWithNext(ei);}
+function groupWithNext(wi,di,ei){const items=wk(wi,di).items;if(ei>=items.length-1){toast("Ajoute un exercice après pour le lier");return;}const a=items[ei],b=items[ei+1];const id=a.group||b.group||uid();a.group=id;b.group=id;persist();render();}
+function ungroupItem(wi,di,ei){const items=wk(wi,di).items;const it=items[ei];const id=it.group;delete it.group;const rem=items.filter(x=>x.group===id);if(rem.length<2)rem.forEach(x=>delete x.group);persist();render();}
+function toggleGroup(wi,di,ei){const it=wk(wi,di).items[ei];if(it.group)ungroupItem(wi,di,ei);else groupWithNext(wi,di,ei);}
 /* ----- modifiers ----- */
 const modDef=key=>MODIFIERS.find(m=>m.key===key);
 function modText(m){const d=modDef(m.key);const lbl=d?d.label:m.key;const v=(m.value==null?"":m.value).toString().trim();return lbl+(v?" "+v+(d&&d.unit?d.unit:""):"");}
-async function addMod(ei){
+async function addMod(wi,di,ei){
   const opts=MODIFIERS.map(m=>({label:m.label+(m.unit?" ("+m.unit+")":""),sub:m.hint,value:m.key}));
   const key=await modalChoose("Ajouter un modificateur",opts);
   if(!key)return;
   const d=modDef(key);
   const val=await modalPrompt(d.label+(d.unit?" ("+d.unit+")":""),"",{title:d.label,ph:d.ph||""});
   if(val==null)return;
-  const it=edWorkout().items[ei];(it.mods=it.mods||[]).push({key,value:val.trim()});
+  const it=wk(wi,di).items[ei];(it.mods=it.mods||[]).push({key,value:val.trim()});
   persist();render();
 }
-function delMod(ei,mi){const it=edWorkout().items[ei];if(!it.mods)return;it.mods.splice(mi,1);if(!it.mods.length)delete it.mods;persist();render();}
+function delMod(wi,di,ei,mi){const it=wk(wi,di).items[ei];if(!it.mods)return;it.mods.splice(mi,1);if(!it.mods.length)delete it.mods;persist();render();}
 
 /* ----- run mutations ----- */
 function toggleDone(ei,si){const it=runWorkout().items[ei];const set=it.sets[si];const ex=exById(it.exId);
@@ -911,12 +939,12 @@ function dragEnd(e){
   if(d.idx==null){render();return;}
   if(d.kind==="wk"&&d.wi!=null) moveWorkout(d.a,d.b,d.wi,d.idx);
   else if(d.kind==="week") moveWeek(d.a,d.idx);
-  else if(d.kind==="ex") moveExercise(d.a,d.idx);
+  else if(d.kind==="ex") moveExercise(edit.wi,edit.di,d.a,d.idx);
   render();
 }
 function moveWorkout(fromWi,fromDi,toWi,toIdx){const weeks=curP().weeks;const [m]=weeks[fromWi].days.splice(fromDi,1);weeks[toWi].days.splice(toIdx,0,m);persist();}
 function moveWeek(from,to){const weeks=curP().weeks;const [m]=weeks.splice(from,1);weeks.splice(to,0,m);persist();}
-function moveExercise(from,to){const items=edWorkout().items;const [m]=items.splice(from,1);items.splice(to,0,m);persist();}
+function moveExercise(wi,di,from,to){const items=wk(wi,di).items;const [m]=items.splice(from,1);items.splice(to,0,m);persist();}
 
 /* ===================== STATS ===================== */
 function loggedSets(){
@@ -1196,7 +1224,7 @@ document.addEventListener("input",e=>{
   const v=t.value.trim();
   const num=()=>v===""?null:+v.replace(",",".");
   if(k==="plan"){
-    const set=edWorkout().items[+t.dataset.ei].sets[+t.dataset.si];const f=t.dataset.f;
+    const set=wk(+t.dataset.wi,+t.dataset.di).items[+t.dataset.ei].sets[+t.dataset.si];const f=t.dataset.f;
     if(f==="load")set.load=num();
     else set[f]=num();
     persist();
