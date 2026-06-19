@@ -148,6 +148,9 @@ label.fld{display:block;font-size:12px;color:var(--mut);margin:0 0 4px}
 .srow .stepwrap{flex:1;min-width:0}
 .rpein{width:60px;flex:none}
 .card.ssitem{border-left:3px solid var(--acc)}
+.mods{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px}
+.modchip{font-size:12px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:3px 9px;color:var(--mut);display:inline-flex;gap:6px;align-items:center}
+.modchip b{color:var(--red);cursor:pointer;font-weight:400}
 </style>
 </head>
 <body>
@@ -178,6 +181,97 @@ function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");cl
 
 const mkset=(p,r,rpe)=>({id:uid(),pct:p,load:null,reps:r,rpe:rpe,aLoad:null,aReps:null,aRpe:null,done:false,date:null});
 const mkcardio=(dur,dist)=>({id:uid(),dur:dur,dist:dist,aDur:null,aDist:null,done:false,date:null});
+
+/* ---------- exercise library [name, category, muscle, metric?, lift?] ---------- */
+const LIB=[
+  ["Squat","Principal","Quadriceps","weight","squat"],
+  ["Développé couché","Principal","Pectoraux","weight","bench"],
+  ["Soulevé de terre","Principal","Ischios","weight","deadlift"],
+  ["Squat avant","Bas du corps","Quadriceps"],
+  ["Développé incliné","Haut du corps","Pectoraux"],
+  ["Développé haltères","Haut du corps","Pectoraux"],
+  ["Écarté haltères","Haut du corps","Pectoraux"],
+  ["Écarté poulie","Haut du corps","Pectoraux"],
+  ["Dips","Haut du corps","Pectoraux"],
+  ["Pompes","Haut du corps","Pectoraux"],
+  ["Rowing barre","Haut du corps","Dos"],
+  ["Rowing haltère","Haut du corps","Dos"],
+  ["Tirage horizontal","Haut du corps","Dos"],
+  ["Tirage vertical","Haut du corps","Dos"],
+  ["Tractions","Haut du corps","Dos"],
+  ["Rowing T-barre","Haut du corps","Dos"],
+  ["Pull-over","Haut du corps","Dos"],
+  ["Développé militaire","Haut du corps","Épaules"],
+  ["Développé haltères épaules","Haut du corps","Épaules"],
+  ["Élévations latérales","Haut du corps","Épaules"],
+  ["Élévations frontales","Haut du corps","Épaules"],
+  ["Oiseau","Haut du corps","Épaules"],
+  ["Face pull","Haut du corps","Épaules"],
+  ["Shrug haltères","Haut du corps","Trapèzes"],
+  ["Shrug barre","Haut du corps","Trapèzes"],
+  ["Curl barre","Haut du corps","Biceps"],
+  ["Curl haltères","Haut du corps","Biceps"],
+  ["Curl pupitre","Haut du corps","Biceps"],
+  ["Curl marteau","Haut du corps","Biceps"],
+  ["Curl incliné","Haut du corps","Biceps"],
+  ["Extension poulie","Haut du corps","Triceps"],
+  ["Barre au front","Haut du corps","Triceps"],
+  ["Extension nuque","Haut du corps","Triceps"],
+  ["Dips triceps","Haut du corps","Triceps"],
+  ["Kickback","Haut du corps","Triceps"],
+  ["Curl poignets","Haut du corps","Avant-bras"],
+  ["Presse à cuisses","Bas du corps","Quadriceps"],
+  ["Fentes","Bas du corps","Quadriceps"],
+  ["Leg extension","Bas du corps","Quadriceps"],
+  ["Hack squat","Bas du corps","Quadriceps"],
+  ["Squat gobelet","Bas du corps","Quadriceps"],
+  ["Soulevé de terre roumain","Bas du corps","Ischios"],
+  ["Leg curl","Bas du corps","Ischios"],
+  ["Good morning","Bas du corps","Ischios"],
+  ["Hip thrust","Bas du corps","Fessiers"],
+  ["Fentes bulgares","Bas du corps","Fessiers"],
+  ["Mollets debout","Bas du corps","Mollets"],
+  ["Mollets assis","Bas du corps","Mollets"],
+  ["Crunch","Autre","Abdos"],
+  ["Planche","Autre","Abdos"],
+  ["Relevé de jambes","Autre","Abdos"],
+  ["Roue abdominale","Autre","Abdos"],
+  ["Extension lombaire","Autre","Lombaires"],
+  ["Course","Cardio","","cardio"],
+  ["Vélo","Cardio","","cardio"],
+  ["Rameur","Cardio","","cardio"],
+  ["Corde à sauter","Cardio","","cardio"],
+  ["Tapis de course","Cardio","","cardio"]
+];
+const MUSCLE_HINTS=[
+  [/poignet|avant-?bras|wrist/,"Avant-bras"],
+  [/squat|presse à? ?cuiss|leg ?ext|hack|gobelet|fente avant|quadri/,"Quadriceps"],
+  [/roumain|rdl|leg ?curl|good morning|ischio|soulevé de terre roumain/,"Ischios"],
+  [/hip thrust|fessier|glute|bulgare/,"Fessiers"],
+  [/mollet|calf|calves/,"Mollets"],
+  [/couch|pectora|écart|ecart|dips(?! triceps)|pompe|chest|incliné|décliné/,"Pectoraux"],
+  [/row|rowing|tirage|traction|lat |dos|pull-?over|pull ?up|t-barre/,"Dos"],
+  [/militaire|ohp|épaule|epaule|élévation|elevation|oiseau|face pull|overhead/,"Épaules"],
+  [/shrug|trapèze|trapeze/,"Trapèzes"],
+  [/triceps|barre au front|kickback|extension (poulie|nuque)/,"Triceps"],
+  [/curl|biceps/,"Biceps"],
+  [/crunch|planche|abdo|gainage|relevé de jambe|roue/,"Abdos"],
+  [/lombaire|hyperext/,"Lombaires"],
+  [/terre|deadlift/,"Ischios"]
+];
+
+/* ---------- modifiers [key, label, unit, placeholder, hint] ---------- */
+const MODIFIERS=[
+  {key:"tempo",label:"Tempo",unit:"",ph:"3-1-1-0",hint:"excentrique-pause-concentrique-pause"},
+  {key:"pause",label:"Pause",unit:"s",ph:"2",hint:"temps de pause (secondes)"},
+  {key:"restpause",label:"Rest-pause",unit:"s",ph:"15",hint:"repos court intra-série"},
+  {key:"dropset",label:"Drop set",unit:"%",ph:"20",hint:"baisse de charge"},
+  {key:"myo",label:"Myo-reps",unit:"",ph:"5+3+3",hint:""},
+  {key:"bande",label:"Élastique / Chaîne",unit:"",ph:"bande verte",hint:"résistance accommodante"},
+  {key:"partiel",label:"Partiel",unit:"",ph:"1/2 amplitude",hint:""},
+  {key:"unilateral",label:"Unilatéral",unit:"",ph:"",hint:"par côté"},
+  {key:"note",label:"Note",unit:"",ph:"…",hint:"texte libre"}
+];
 
 /* ---------- state ---------- */
 let S=load();
@@ -221,14 +315,17 @@ function migrate(o){
   })))));
   return o;
 }
+function libExercises(){
+  return LIB.map(([name,category,muscle,metric,lift])=>({id:uid(),name,category,muscle:muscle||null,metric:metric||"weight",lift:lift||null,orm:0}));
+}
 function seed(){
-  const sq={id:uid(),name:"Squat",category:"Principal",muscle:"Quadriceps",metric:"weight",lift:"squat",orm:180};
-  const bn={id:uid(),name:"Développé couché",category:"Principal",muscle:"Pectoraux",metric:"weight",lift:"bench",orm:120};
-  const dl={id:uid(),name:"Soulevé de terre",category:"Principal",muscle:"Ischios",metric:"weight",lift:"deadlift",orm:220};
-  const rw={id:uid(),name:"Rowing barre",category:"Haut du corps",muscle:"Dos",metric:"weight",lift:null,orm:0};
+  const exs=libExercises();
+  const find=n=>exs.find(e=>e.name===n);
+  const sq=find("Squat"),bn=find("Développé couché"),dl=find("Soulevé de terre"),rw=find("Rowing barre");
+  sq.orm=180;bn.orm=120;dl.orm=220;
   return {
     v:2,updatedAt:nowISO(),
-    exercises:[sq,bn,dl,rw],
+    exercises:exs,
     settings:{round:2.5,sex:"M",bar:20,rest:120},
     bodyweight:[],
     programs:[{id:uid(),name:"Bloc 1",weeks:[
@@ -455,6 +552,7 @@ function viewEditor(){
       <div class="row" style="gap:6px;flex:none">
         <button class="sm gh" onclick="toggleGroup(${ei})">${g?'⛓ délier':'⛓ lier'}</button>
         <button class="sm danger" onclick="delItem(${ei})">✕</button></div></div>`;
+    h+=`${(it.mods&&it.mods.length)?`<div class="mods">`+it.mods.map((m,mi)=>`<span class="modchip">${esc(modText(m))} <b onclick="delMod(${ei},${mi})">✕</b></span>`).join("")+`</div>`:''}<button class="full sm gh mb" onclick="addMod(${ei})">+ modificateur</button>`;
     h+= cardio
       ? `<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`
       : `<div class="setrow"><div></div><div class="lab">${ex&&ex.orm>0?'%1RM':'KG'}</div><div class="lab">REPS</div><div class="lab">RPE</div><div></div></div>`;
@@ -542,6 +640,7 @@ function viewRun(){
       ${it.muscle?`<button class="sm gh" style="flex:none" onclick="chooseForMuscle(${ei})">${ex?'changer':'choisir'}</button>`:`<div class="mut">cible</div>`}</div>`;
     if(it.muscle&&ex)h+=`<div class="mut" style="margin:-4px 0 8px">${esc(ex.name)} · 💪 ${esc(it.muscle)}</div>`;
     if(!cardio){const lt=lastTimeFor(itemKey(it));if(lt)h+=`<div class="lasttime">↺ ${lt.date} : ${fmt(lt.load)} kg × ${fmt(lt.reps)}${lt.rpe?` @${fmt(lt.rpe)}`:''}</div>`;}
+    if(it.mods&&it.mods.length)h+=`<div class="mods">`+it.mods.map(m=>`<span class="modchip">${esc(modText(m))}</span>`).join("")+`</div>`;
     if(cardio){
       h+=`<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`;
       it.sets.forEach((set,si)=>{
@@ -689,6 +788,20 @@ function groupLabels(items){
 function groupWithNext(ei){const items=edWorkout().items;if(ei>=items.length-1){toast("Ajoute un exercice après pour le lier");return;}const a=items[ei],b=items[ei+1];const id=a.group||b.group||uid();a.group=id;b.group=id;persist();render();}
 function ungroupItem(ei){const items=edWorkout().items;const it=items[ei];const id=it.group;delete it.group;const rem=items.filter(x=>x.group===id);if(rem.length<2)rem.forEach(x=>delete x.group);persist();render();}
 function toggleGroup(ei){const it=edWorkout().items[ei];if(it.group)ungroupItem(ei);else groupWithNext(ei);}
+/* ----- modifiers ----- */
+const modDef=key=>MODIFIERS.find(m=>m.key===key);
+function modText(m){const d=modDef(m.key);const lbl=d?d.label:m.key;const v=(m.value==null?"":m.value).toString().trim();return lbl+(v?" "+v+(d&&d.unit?d.unit:""):"");}
+async function addMod(ei){
+  const opts=MODIFIERS.map(m=>({label:m.label+(m.unit?" ("+m.unit+")":""),sub:m.hint,value:m.key}));
+  const key=await modalChoose("Ajouter un modificateur",opts);
+  if(!key)return;
+  const d=modDef(key);
+  const val=await modalPrompt(d.label+(d.unit?" ("+d.unit+")":""),"",{title:d.label,ph:d.ph||""});
+  if(val==null)return;
+  const it=edWorkout().items[ei];(it.mods=it.mods||[]).push({key,value:val.trim()});
+  persist();render();
+}
+function delMod(ei,mi){const it=edWorkout().items[ei];if(!it.mods)return;it.mods.splice(mi,1);if(!it.mods.length)delete it.mods;persist();render();}
 
 /* ----- run mutations ----- */
 function toggleDone(ei,si){const it=runWorkout().items[ei];const set=it.sets[si];const ex=exById(it.exId);
@@ -1036,7 +1149,9 @@ function viewData(){
     <select onchange="S.settings.rest=+this.value;persist()">
       ${[60,90,120,150,180,240].map(r=>`<option value="${r}" ${(S.settings.rest||120)===r?"selected":""}>${fmtTime(r)}</option>`).join("")}
     </select></div>`;
-  h+=`<h2>Bibliothèque d'exercices</h2>`+S.exercises.map(ex=>exEditorCard(ex)).join("")+
+  h+=`<h2>Bibliothèque d'exercices</h2>`+
+    `<button class="full acc mb" onclick="completeLibrary()">✨ Compléter (muscles + exercices courants)</button>`+
+    S.exercises.map(ex=>exEditorCard(ex)).join("")+
     `<button class="full gh mb" onclick="addEx()">+ Ajouter un exercice</button>`;
   h+=`<h2>Sauvegarde locale (fichier)</h2><div class="card">
     <div class="mut mb">En plus du cloud, tu peux exporter/importer un fichier JSON.</div>
@@ -1100,6 +1215,24 @@ document.addEventListener("input",e=>{
 
 /* ---------- exercises / data ---------- */
 function setEx(id,f,v){const ex=exById(id);if(!ex)return;ex[f]=((f==="lift"||f==="muscle")&&v==="")?null:v;persist();}
+function inferMuscle(ex){
+  if(ex.muscle)return ex.muscle;
+  if(ex.metric==="cardio")return null;
+  const n=(ex.name||"").toLowerCase();
+  for(const [re,mu] of MUSCLE_HINTS){if(re.test(n))return mu;}
+  return null;
+}
+async function completeLibrary(){
+  if(!await modalConfirm("Ajouter les exercices courants manquants et taguer (muscle) les exercices existants ?",{ok:"Compléter"}))return;
+  let added=0,tagged=0;
+  S.exercises.forEach(ex=>{if(!ex.muscle){const m=inferMuscle(ex);if(m){ex.muscle=m;tagged++;}}});
+  const have=new Set(S.exercises.map(e=>(e.name||"").trim().toLowerCase()));
+  LIB.forEach(([name,category,muscle,metric,lift])=>{
+    if(have.has(name.toLowerCase()))return;
+    S.exercises.push({id:uid(),name,category,muscle:muscle||null,metric:metric||"weight",lift:lift||null,orm:0});added++;
+  });
+  persist();render();toast(added+" ajoutés · "+tagged+" tagués");
+}
 async function addEx(){const n=await modalPrompt("Nom de l'exercice");if(!n)return;
   S.exercises.push({id:uid(),name:n.trim(),category:"Autre",metric:"weight",lift:null,orm:0});persist();render();}
 async function delEx(id){if(await modalConfirm("Supprimer cet exercice de la bibliothèque ?",{danger:true,ok:"Supprimer"})){
