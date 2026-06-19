@@ -222,10 +222,10 @@ function migrate(o){
   return o;
 }
 function seed(){
-  const sq={id:uid(),name:"Squat",category:"Principal",metric:"weight",lift:"squat",orm:180};
-  const bn={id:uid(),name:"Développé couché",category:"Principal",metric:"weight",lift:"bench",orm:120};
-  const dl={id:uid(),name:"Soulevé de terre",category:"Principal",metric:"weight",lift:"deadlift",orm:220};
-  const rw={id:uid(),name:"Rowing barre",category:"Haut du corps",metric:"weight",lift:null,orm:0};
+  const sq={id:uid(),name:"Squat",category:"Principal",muscle:"Quadriceps",metric:"weight",lift:"squat",orm:180};
+  const bn={id:uid(),name:"Développé couché",category:"Principal",muscle:"Pectoraux",metric:"weight",lift:"bench",orm:120};
+  const dl={id:uid(),name:"Soulevé de terre",category:"Principal",muscle:"Ischios",metric:"weight",lift:"deadlift",orm:220};
+  const rw={id:uid(),name:"Rowing barre",category:"Haut du corps",muscle:"Dos",metric:"weight",lift:null,orm:0};
   return {
     v:2,updatedAt:nowISO(),
     exercises:[sq,bn,dl,rw],
@@ -261,6 +261,11 @@ const curP=()=>S.programs[curPi];
 const edWorkout=()=>S.programs[curPi].weeks[edit.wi].days[edit.di];
 const runWorkout=()=>S.programs[curPi].weeks[running.wi].days[running.di];
 const setProgress=d=>{const tot=d.items.reduce((s,it)=>s+it.sets.length,0);const done=d.items.reduce((s,it)=>s+it.sets.filter(x=>x.done).length,0);return{tot,done};};
+const MUSCLES=["Pectoraux","Dos","Épaules","Biceps","Triceps","Avant-bras","Quadriceps","Ischios","Fessiers","Mollets","Abdos","Lombaires","Trapèzes"];
+const itemEx=it=>it.exId?exById(it.exId):null;
+const itemName=it=>{const ex=itemEx(it);return ex?ex.name:(it.muscle?"💪 "+it.muscle:"?");};
+const itemKey=it=>it.exId||(it.muscle?"m:"+it.muscle:null);
+const exName=id=>{if(!id)return "?";if(typeof id==="string"&&id.slice(0,2)==="m:")return "💪 "+id.slice(2);const e=exById(id);return e?e.name:"?";};
 
 /* ---------- cloud sync (jsonbin.io) ---------- */
 const Cloud={
@@ -437,6 +442,7 @@ function viewEditor(){
   const gl=groupLabels(d.items);
   d.items.forEach((it,ei)=>{
     const ex=exById(it.exId);
+    const wild=!ex&&it.muscle;
     const cardio=ex&&ex.metric==="cardio";
     const tagCls=isMain(ex)?"main":cardio?"cardio":"";
     const g=gl[ei];
@@ -444,8 +450,8 @@ function viewEditor(){
       <div class="row" style="gap:6px;min-width:0">
         <span class="grip" onpointerdown="dragStart(event,'ex',${ei},0)">⋮⋮</span>
         ${g?`<span class="sslabel">${g.letter}${g.n}</span>`:''}
-        <span style="font-weight:600">${esc(ex?ex.name:'?')}</span>
-        <span class="tag ${tagCls}">${ex?esc(ex.category):''}</span></div>
+        <span style="font-weight:600">${esc(itemName(it))}</span>
+        <span class="tag ${wild?'':tagCls}">${wild?'joker':(ex?esc(ex.category):'')}</span></div>
       <div class="row" style="gap:6px;flex:none">
         <button class="sm gh" onclick="toggleGroup(${ei})">${g?'⛓ délier':'⛓ lier'}</button>
         <button class="sm danger" onclick="delItem(${ei})">✕</button></div></div>`;
@@ -487,7 +493,7 @@ function platesFor(target,bar){
 }
 function lastTimeFor(exId){
   const byDate={};
-  S.programs.forEach(p=>p.weeks.forEach(w=>w.days.forEach(d=>d.items.forEach(it=>{if(it.exId!==exId)return;it.sets.forEach(s=>{if(s.done&&s.aLoad&&s.aReps&&s.date)(byDate[s.date]=byDate[s.date]||[]).push(s);});}))));
+  S.programs.forEach(p=>p.weeks.forEach(w=>w.days.forEach(d=>d.items.forEach(it=>{if(itemKey(it)!==exId)return;it.sets.forEach(s=>{if(s.done&&s.aLoad&&s.aReps&&s.date)(byDate[s.date]=byDate[s.date]||[]).push(s);});}))));
   const dates=Object.keys(byDate).sort();if(!dates.length)return null;
   let cur=today();
   if(running){const rd=runWorkout().items.flatMap(it=>it.sets).filter(s=>s.date).map(s=>s.date).sort();if(rd.length)cur=rd[rd.length-1];}
@@ -530,10 +536,12 @@ function viewRun(){
   if(!d.items.length) h+=`<div class="empty">Aucun exercice dans cette séance.<br><button class="gh sm" onclick="openEditor(${running.wi},${running.di})">Planifier</button></div>`;
   const glR=groupLabels(d.items);
   d.items.forEach((it,ei)=>{
-    const ex=exById(it.exId);const cardio=ex&&ex.metric==="cardio";const g=glR[ei];
+    const ex=exById(it.exId);const wild=it.muscle&&!ex;const cardio=ex&&ex.metric==="cardio";const g=glR[ei];
     h+=`<div class="card ${g?'ssitem':''}"><div class="row between mb">
-      <div style="font-weight:600">${g?`<span class="sslabel">${g.letter}${g.n}</span> `:''}${esc(ex?ex.name:'?')}</div><div class="mut">cible</div></div>`;
-    if(!cardio){const lt=lastTimeFor(it.exId);if(lt)h+=`<div class="lasttime">↺ ${lt.date} : ${fmt(lt.load)} kg × ${fmt(lt.reps)}${lt.rpe?` @${fmt(lt.rpe)}`:''}</div>`;}
+      <div style="font-weight:600;min-width:0">${g?`<span class="sslabel">${g.letter}${g.n}</span> `:''}${esc(itemName(it))}</div>
+      ${it.muscle?`<button class="sm gh" style="flex:none" onclick="chooseForMuscle(${ei})">${ex?'changer':'choisir'}</button>`:`<div class="mut">cible</div>`}</div>`;
+    if(it.muscle&&ex)h+=`<div class="mut" style="margin:-4px 0 8px">${esc(ex.name)} · 💪 ${esc(it.muscle)}</div>`;
+    if(!cardio){const lt=lastTimeFor(itemKey(it));if(lt)h+=`<div class="lasttime">↺ ${lt.date} : ${fmt(lt.load)} kg × ${fmt(lt.reps)}${lt.rpe?` @${fmt(lt.rpe)}`:''}</div>`;}
     if(cardio){
       h+=`<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`;
       it.sets.forEach((set,si)=>{
@@ -624,7 +632,7 @@ async function nextBlock(){
   S.exercises.forEach(e=>{if(e.category==="Principal"&&e.orm>0)e.orm=Math.round((e.orm+add)*100)/100;});
   const c=JSON.parse(JSON.stringify(curP()));reId(c);
   c.name=curP().name.replace(/\s*[•+].*$/,"")+" • bloc suivant";
-  c.weeks.forEach(w=>w.days.forEach(d=>d.items.forEach(it=>it.sets.forEach(resetLog))));
+  c.weeks.forEach(w=>w.days.forEach(d=>d.items.forEach(it=>{if(it.muscle)it.exId=null;it.sets.forEach(resetLog);})));
   S.programs.splice(curPi+1,0,c);curPi++;edit=null;running=null;
   persist();render();toast("Bloc suivant créé"+(add?` (1RM +${add} kg)`:""));
 }
@@ -632,23 +640,30 @@ async function delProgram(){if(await modalConfirm("Supprimer ce programme et tou
 function addWeek(){curP().weeks.push({id:uid(),name:"Semaine "+(curP().weeks.length+1),days:[]});persist();render();}
 async function renameWeek(wi){const w=curP().weeks[wi];const n=await modalPrompt("Renommer la semaine",w.name);if(n){w.name=n;persist();render();}}
 function dupWeek(wi){const w=curP().weeks[wi];const c=JSON.parse(JSON.stringify(w));reId(c);c.name=w.name+" (copie)";
-  c.days.forEach(d=>d.items.forEach(it=>it.sets.forEach(resetLog)));
+  c.days.forEach(d=>d.items.forEach(it=>{if(it.muscle)it.exId=null;it.sets.forEach(resetLog);}));
   curP().weeks.splice(wi+1,0,c);persist();toast("Semaine dupliquée");render();}
 function delWeek(wi){snapshot("Semaine supprimée");curP().weeks.splice(wi,1);persist();render();}
 async function addWorkout(wi){const w=curP().weeks[wi];const n=await modalPrompt("Nom de la séance","Séance "+String.fromCharCode(65+w.days.length));
   if(n){w.days.push({id:uid(),name:n,items:[]});persist();render();}}
 async function renameWorkout(){const d=edWorkout();const n=await modalPrompt("Renommer la séance",d.name);if(n){d.name=n;persist();render();}}
 function dupWorkout(){const w=curP().weeks[edit.wi];const c=JSON.parse(JSON.stringify(w.days[edit.di]));reId(c);c.name=c.name+" (copie)";
-  c.items.forEach(it=>it.sets.forEach(resetLog));w.days.splice(edit.di+1,0,c);edit={wi:edit.wi,di:edit.di+1};persist();toast("Séance dupliquée");render();}
+  c.items.forEach(it=>{if(it.muscle)it.exId=null;it.sets.forEach(resetLog);});w.days.splice(edit.di+1,0,c);edit={wi:edit.wi,di:edit.di+1};persist();toast("Séance dupliquée");render();}
 function delWorkout(){snapshot("Séance supprimée");curP().weeks[edit.wi].days.splice(edit.di,1);edit=null;persist();scrollTop();render();}
 function reId(o){if(o&&typeof o==="object"){if("id" in o)o.id=uid();for(const k in o){const v=o[k];if(Array.isArray(v))v.forEach(reId);else if(v&&typeof v==="object")reId(v);}}return o;}
 function resetLog(s){s.aLoad=s.aReps=s.aRpe=s.aDur=s.aDist=null;s.done=false;s.date=null;}
 
 /* ----- exercise (in editor) mutations ----- */
 async function addItem(){
-  const items=S.exercises.map(e=>({label:e.name,sub:e.category,value:e.id}));
-  const v=await modalChoose("Ajouter un exercice",items,{search:true,newLabel:"＋ Nouvel exercice"});
+  const items=[
+    ...MUSCLES.map(mu=>({label:"💪 "+mu,sub:"muscle / joker",value:"m:"+mu})),
+    ...S.exercises.map(e=>({label:e.name,sub:e.muscle||e.category,value:e.id}))
+  ];
+  const v=await modalChoose("Ajouter un exercice ou un muscle",items,{search:true,newLabel:"＋ Nouvel exercice"});
   if(v==null)return;
+  if(typeof v==="string"&&v.slice(0,2)==="m:"){
+    edWorkout().items.push({id:uid(),exId:null,muscle:v.slice(2),sets:[mkset(null,12,8)]});
+    persist();render();return;
+  }
   let ex;
   if(v==="__new__"){
     const name=await modalPrompt("Nom du nouvel exercice");if(!name)return;
@@ -696,6 +711,16 @@ function finishRun(){
   const d=runWorkout();let n=0;
   d.items.forEach(it=>it.sets.forEach(s=>{if(s.done){n++;if(!s.date)s.date=today();}}));
   persist();toast(n+" séries enregistrées");running=null;wakeOff();restSkip();scrollTop();render();
+}
+async function chooseForMuscle(ei){
+  const it=runWorkout().items[ei];const mu=it.muscle;if(!mu)return;
+  const list=S.exercises.filter(e=>e.muscle===mu&&e.metric!=="cardio").map(e=>({label:e.name,sub:e.muscle,value:e.id}));
+  const opts=[{label:"— Garder « 💪 "+mu+" » —",value:"__keep__"},...list];
+  const v=await modalChoose("Exercice pour "+mu,opts,{search:true,newLabel:"＋ Nouvel exercice ("+mu+")"});
+  if(v==null)return;
+  if(v==="__keep__"){it.exId=null;persist();render();return;}
+  if(v==="__new__"){const name=await modalPrompt("Nom du nouvel exercice ("+mu+")");if(!name)return;const ex={id:uid(),name:name.trim(),category:"Autre",muscle:mu,metric:"weight",lift:null,orm:0};S.exercises.push(ex);it.exId=ex.id;persist();render();return;}
+  it.exId=v;persist();render();
 }
 
 /* ===================== DRAG & DROP ===================== */
@@ -784,7 +809,7 @@ function moveExercise(from,to){const items=edWorkout().items;const [m]=items.spl
 function loggedSets(){
   const out=[];
   S.programs.forEach(p=>p.weeks.forEach((w,wi)=>w.days.forEach(d=>d.items.forEach(it=>it.sets.forEach(s=>{
-    if(s.done&&s.aLoad&&s.aReps) out.push({exId:it.exId,load:+s.aLoad,reps:+s.aReps,e1:e1rm(+s.aLoad,+s.aReps),pn:p.name,wn:w.name,wi,date:s.date});
+    if(s.done&&s.aLoad&&s.aReps) out.push({exId:itemKey(it),load:+s.aLoad,reps:+s.aReps,e1:e1rm(+s.aLoad,+s.aReps),pn:p.name,wn:w.name,wi,date:s.date});
   })))));
   return out;
 }
@@ -917,19 +942,20 @@ function viewStats(){
     if(sets.length<2)return;
     h+=`<div class="card"><div class="mut mb">${esc(ex.name)}</div>${lineSvg(sets.map(s=>({t:Date.parse(s.date)||0,v:s.e1})))}</div>`;
   });
-  const ids=[...new Set(ls.map(s=>s.exId))];
+  const ids=[...new Set(ls.map(s=>s.exId))].filter(Boolean);
   if(ids.length){
-    h+=`<h2>Historique par exercice</h2>`+ids.map(id=>{const ex=exById(id);const c=ls.filter(s=>s.exId===id).length;
-      return `<div class="card row between" onclick="openStatEx('${id}')"><div style="font-weight:600">${esc(ex?ex.name:'?')}</div><div class="mut">${c} séries ›</div></div>`;
+    h+=`<h2>Historique par exercice</h2>`+ids.map(id=>{const c=ls.filter(s=>s.exId===id).length;
+      return `<div class="card row between" onclick="openStatEx('${id}')"><div style="font-weight:600">${esc(exName(id))}</div><div class="mut">${c} séries ›</div></div>`;
     }).join("");
   }
   return h;
 }
 function viewStatEx(){
   const ex=exById(statEx);
-  if(!ex){statEx=null;return viewStats();}
+  const isM=typeof statEx==="string"&&statEx.slice(0,2)==="m:";
+  if(!ex&&!isM){statEx=null;return viewStats();}
   const sets=loggedSets().filter(s=>s.exId===statEx).sort((a,b)=>(a.date||"").localeCompare(b.date||""));
-  let h=`<div class="crumb"><a onclick="statEx=null;render()">‹ Stats</a></div><h1 style="margin:0 0 10px">${esc(ex.name)}</h1>`;
+  let h=`<div class="crumb"><a onclick="statEx=null;render()">‹ Stats</a></div><h1 style="margin:0 0 10px">${esc(ex?ex.name:exName(statEx))}</h1>`;
   if(!sets.length) return h+`<div class="empty">Aucune série enregistrée pour cet exercice.</div>`;
   const best=Math.max(...sets.map(s=>s.e1));
   h+=`<div class="card row between"><div><div class="mut">Meilleur e1RM</div><div class="stat">${best} <span style="font-size:14px;color:var(--mut)">kg</span></div></div>
@@ -1035,6 +1061,8 @@ function exEditorCard(ex){
       </select>
       <select onchange="setEx('${ex.id}','lift',this.value)" title="Mouvement de compétition (DOTS)">${lifts.map(([v,l])=>`<option value="${v}" ${(ex.lift||"")===v?"selected":""}>${l}</option>`).join("")}</select>
     </div>
+    <div class="row mb"><span class="mut" style="min-width:64px">Muscle</span>
+      <select onchange="setEx('${ex.id}','muscle',this.value)"><option value="" ${!ex.muscle?"selected":""}>—</option>${MUSCLES.map(mu=>`<option ${ex.muscle===mu?"selected":""}>${mu}</option>`).join("")}</select></div>
     ${ex.metric!=="cardio"?`<div class="row mb"><span class="mut" style="min-width:64px">1RM réf.</span><input inputmode="decimal" value="${ex.orm||''}" placeholder="kg" data-k="orm" data-id="${ex.id}"></div>`:`<div class="mut mb">Exercice cardio (durée / distance).</div>`}
     <button class="sm danger" onclick="delEx('${ex.id}')">Supprimer</button>
   </div>`;
@@ -1071,7 +1099,7 @@ document.addEventListener("input",e=>{
 });
 
 /* ---------- exercises / data ---------- */
-function setEx(id,f,v){const ex=exById(id);if(!ex)return;ex[f]=(f==="lift"&&v==="")?null:v;persist();}
+function setEx(id,f,v){const ex=exById(id);if(!ex)return;ex[f]=((f==="lift"||f==="muscle")&&v==="")?null:v;persist();}
 async function addEx(){const n=await modalPrompt("Nom de l'exercice");if(!n)return;
   S.exercises.push({id:uid(),name:n.trim(),category:"Autre",metric:"weight",lift:null,orm:0});persist();render();}
 async function delEx(id){if(await modalConfirm("Supprimer cet exercice de la bibliothèque ?",{danger:true,ok:"Supprimer"})){
