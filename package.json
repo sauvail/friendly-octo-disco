@@ -1,0 +1,16 @@
+{
+  "name": "suivi-muscu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Suivi Muscu — personal gym & powerlifting tracker (PWA). E2E tests with Cypress.",
+  "scripts": {
+    "serve": "python3 -m http.server 8000 --bind 127.0.0.1",
+    "cy:open": "cypress open --e2e --browser electron",
+    "cy:run": "cypress run",
+    "e2e": "start-server-and-test serve http://127.0.0.1:8000 cy:run"
+  },
+  "devDependencies": {
+    "cypress": "^13.17.0",
+    "start-server-and-test": "^2.0.12"
+  }
+}

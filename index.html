@@ -719,7 +719,8 @@ function backToBoard(){edit=null;running=null;editAll=false;wakeOff();restSkip()
 function toggleColl(id){COLL.has(id)?COLL.delete(id):COLL.add(id);render();}
 
 /* ----- popover menus ----- */
-function closeMenu(){const e=$(".popmenu");if(e)e.remove();}
+let menuDismiss=null;
+function closeMenu(){const e=$(".popmenu");if(e)e.remove();if(menuDismiss){document.removeEventListener("pointerdown",menuDismiss,true);menuDismiss=null;}}
 function popMenu(ev,items){
   ev.stopPropagation();closeMenu();
   const m=document.createElement("div");m.className="popmenu";
@@ -729,7 +730,9 @@ function popMenu(ev,items){
   const r=ev.currentTarget.getBoundingClientRect();
   m.style.top=Math.min(r.bottom+4,window.innerHeight-m.offsetHeight-8)+"px";
   m.style.right=Math.max(8,window.innerWidth-r.right)+"px";
-  setTimeout(()=>document.addEventListener("pointerdown",closeMenu,{once:true}),0);
+  // dismiss only when the pointer goes down OUTSIDE the menu (not on a menu item)
+  menuDismiss=(e)=>{if(!m.contains(e.target))closeMenu();};
+  setTimeout(()=>document.addEventListener("pointerdown",menuDismiss,true),0);
 }
 function progMenu(ev){popMenu(ev,[
   ["Renommer",renameProg],
@@ -1375,7 +1378,7 @@ if(Cloud.enabled())Cloud.pull();
 window.addEventListener("online",()=>{renderSync();if(Cloud.enabled()&&!Cloud.dirty)Cloud.pull();});
 window.addEventListener("offline",()=>Cloud.setStatus("off"));
 document.addEventListener("visibilitychange",()=>{if(!document.hidden){if(running)wakeOn();if(Cloud.enabled()&&!Cloud.dirty)Cloud.pull();}});
-if("serviceWorker" in navigator && location.protocol!=="file:") window.addEventListener("load",()=>{
+if("serviceWorker" in navigator && location.protocol!=="file:" && !window.Cypress) window.addEventListener("load",()=>{
   navigator.serviceWorker.register("sw.js").then(reg=>{
     reg.addEventListener("updatefound",()=>{const nw=reg.installing;if(nw)nw.addEventListener("statechange",()=>{if(nw.state==="installed"&&navigator.serviceWorker.controller)showUpdate(reg);});});
   }).catch(()=>{});
