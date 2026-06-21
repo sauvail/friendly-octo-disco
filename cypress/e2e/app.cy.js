@@ -165,7 +165,7 @@ describe("Running a workout", () => {
     cy.get(".chk").first().click();
     cy.get(".chk.on").should("exist");
     cy.get("#rest").should("have.class", "show"); // rest timer auto-started
-    cy.get("#rest").contains("Passer").click();    // dismiss it (it overlays Terminer)
+    // "Terminer" must be reachable even while the rest timer bar is showing (no overlap)
     cy.contains("Terminer & enregistrer").click();
     cy.get(".wcard").should("exist"); // back to the board
   });
@@ -182,8 +182,7 @@ describe("Stats", () => {
   it("shows records and the consistency calendar after logging", () => {
     cy.contains(".wcard", "Séance A").find(".runbtn").click();
     cy.get(".chk").first().click(); // log the first squat set
-    cy.get("#rest").contains("Passer").click(); // dismiss rest timer overlay
-    cy.contains("Terminer & enregistrer").click();
+    cy.contains("Terminer & enregistrer").click(); // reachable despite the rest timer
     cy.tab("Stats");
     cy.contains("h2", "Records");
     cy.get(".cal .d").should("have.length.at.least", 30); // 12-week heatmap

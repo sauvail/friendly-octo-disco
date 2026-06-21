@@ -126,6 +126,7 @@ label.fld{display:block;font-size:12px;color:var(--mut);margin:0 0 4px}
 .stepbtn.l{border-radius:10px 0 0 10px}.stepbtn.r{border-radius:0 10px 10px 0}
 .resttimer{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);background:var(--acc);color:#fff;border-radius:14px;padding:9px 14px;display:none;align-items:center;gap:12px;z-index:86;box-shadow:0 8px 24px rgba(0,0,0,.45)}
 .resttimer.show{display:flex}
+body.running #app{padding-bottom:calc(176px + env(safe-area-inset-bottom))} /* keep "Terminer" clear of the rest-timer bar */
 .resttimer .rt-time{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;min-width:54px;text-align:center}
 .resttimer button{min-height:0;padding:6px 10px;background:rgba(255,255,255,.2);border:none;color:#fff;border-radius:8px;font-size:13px}
 .lasttime{font-size:12px;color:var(--green);margin:-3px 0 8px 40px}
@@ -477,6 +478,7 @@ function render(){
   if(view==="prog") a.innerHTML = running?viewRun() : editAll?viewEditAll() : edit?viewEditor() : viewBoard();
   else if(view==="stats") a.innerHTML = statEx?viewStatEx():viewStats();
   else a.innerHTML = viewData();
+  document.body.classList.toggle("running", view==="prog" && !!running);
   renderSync();
 }
 function renderNav(){
