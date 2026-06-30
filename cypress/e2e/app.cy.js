@@ -365,3 +365,74 @@ describe("Sessions, history, phone Back, done-state, joker history", () => {
     cy.contains(".card", "💪 Biceps").find(".lasttime").should("exist");
   });
 });
+
+describe("Phone Back layers, session delete, rest timer, notifications", () => {
+  // helper: run Séance A, log one set, save → creates one session
+  const logOneSession = () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.get(".chk").first().click();
+    cy.contains("Terminer & enregistrer").click();
+    cy.get(".wcard").should("exist");
+  };
+
+  it("phone Back closes an open modal without leaving the editor", () => {
+    cy.openWorkout("Séance A");
+    cy.contains("button", "Exercice").click();
+    cy.get(".scrim").should("be.visible"); // chooser modal is open
+    cy.go("back");
+    cy.get(".scrim").should("not.exist"); // modal closed…
+    cy.contains("#app h1", "Séance A"); // …and we're still in the editor
+  });
+
+  it("phone Back closes an open pop-over menu", () => {
+    cy.openWorkout("Séance A");
+    cy.get("#app .iconbtn").click(); // workout ⋯ menu
+    cy.get(".popmenu").should("be.visible");
+    cy.go("back");
+    cy.get(".popmenu").should("not.exist");
+    cy.contains("#app h1", "Séance A"); // still in the editor, not the board
+  });
+
+  it("phone Back leaves a session detail back to the Stats list", () => {
+    logOneSession();
+    cy.tab("Stats");
+    cy.contains(".card", "Séance A").click(); // open session detail
+    cy.contains("Série 1");
+    cy.go("back");
+    cy.contains("h2", "Séances récentes"); // back on the history list
+  });
+
+  it("deletes a stored session (with undo offered)", () => {
+    logOneSession();
+    cy.tab("Stats");
+    cy.contains("h2", "Séances récentes");
+    cy.contains(".card", "Séance A").click();
+    cy.contains("button", "Supprimer cette séance").click();
+    cy.get("#snack").should("have.class", "show"); // undo snackbar
+    cy.contains("h2", "Séances récentes").should("not.exist"); // history now empty
+  });
+
+  it("rest timer is deadline-based: counts down and auto-ends", () => {
+    cy.clock();
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.get(".setline").first().find(".chk").click(); // auto-starts the rest timer
+    cy.get("#rest").should("have.class", "show");
+    cy.get("#restTime").invoke("text").then((t0) => {
+      cy.tick(10000); // 10 s later
+      cy.get("#restTime").invoke("text").should("not.equal", t0); // it counted down
+    });
+    cy.tick(120000); // run past the deadline + the auto-hide delay
+    cy.get("#rest").should("not.have.class", "show"); // timer ended and hid itself
+  });
+
+  it("rest-end notification toggle turns on when permission is granted", () => {
+    cy.tab("Données");
+    cy.window().then((win) => {
+      win.Notification = function () {};
+      win.Notification.permission = "granted";
+      win.Notification.requestPermission = () => Promise.resolve("granted");
+    });
+    cy.get('input[type="checkbox"]').check();
+    cy.get('input[type="checkbox"]').should("be.checked"); // persisted in settings + re-rendered
+  });
+});
