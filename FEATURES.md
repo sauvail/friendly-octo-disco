@@ -25,9 +25,10 @@ A complete, detailed reference of every feature in the app, for future developme
 S = {
   v: 2,                       // schema version
   updatedAt: ISO string,      // bumped on every change → drives last-write-wins sync
-  settings: { round, sex, bar, rest },
+  settings: { round, sex, bar, rest, notify },   // notify = end-of-rest OS notification opt-in
   exercises: [ Exercise ],    // the library
   bodyweight: [ { id, date, kg } ],
+  sessions: [ Session ],      // recorded executions (decoupled from the plan) — see §8/§10
   programs: [ Program ]
 }
 
@@ -48,10 +49,15 @@ Item    = { id, exId, muscle?, group?, mods?, rest?, sets: [ Set ] }
   mods   : [ { key, value } ] modifiers (tempo, pause, …)
   rest   : per-exercise rest seconds (defaults to settings.rest); feeds the rest timer + duration estimate
 
-Set (weight) = { id, load, reps, rpe, aLoad, aReps, aRpe, done, date }   // reps may be the string "AMRAP"
-Set (carry)  = { id, load, dist, aLoad, aDist, done, date }              // load (kg) × distance (m)
-Set (cardio) = { id, dur, dist, aDur, aDist, done, date }
-  planned fields above; a* fields = actual (logged); done + date set on completion.
+Set (weight) = { id, load, reps, rpe }     // TARGETS only. reps may be the string "AMRAP"
+Set (carry)  = { id, load, dist }          // load (kg) × distance (m)
+Set (cardio) = { id, dur, dist }
+  Plan sets hold targets only — a run never mutates them. Actuals are stored in S.sessions.
+
+Session = { id, ts, date, programName, weekName, dayId, dayName, entries: [ Entry ] }
+Entry   = { exId, muscle, name, metric, sets: [ { load, reps, rpe } | {load,dist} | {dur,dist} ] }
+  One Session is appended each time you finish a run; only the sets you marked done are kept.
+  dayId links a session back to the plan day it came from (used for the board's "last session" line).
 ```
 
 ### Storage keys
@@ -61,7 +67,7 @@ Set (cardio) = { id, dur, dist, aDur, aDist, done, date }
 ### Constants
 - **MUSCLES** (13): Pectoraux, Dos, Épaules, Biceps, Triceps, Avant-bras, Quadriceps, Ischios, Fessiers, Mollets, Abdos, Lombaires, Trapèzes.
 - **MODIFIERS** (9): Tempo, Pause (s), Rest-pause (s), Drop set (%), Myo-reps, Élastique/Chaîne, Partiel, Unilatéral, Note.
-- **Default settings:** rounding `2.5 kg`, sex `M`, bar `20 kg`, default rest `120 s`.
+- **Default settings:** rounding `2.5 kg`, sex `M`, bar `20 kg`, default rest `120 s`, rest notifications `off`.
 
 ### Navigation (bottom tabs)
 **🗓️ Programme** · **📈 Stats** · **⚙️ Données**. A persistent top bar shows the app name and the cloud **sync status pill**.
@@ -74,7 +80,7 @@ The Programme tab shows the selected program as a **vertical kanban**.
 
 - **Program switcher** — horizontal "chips" at the top; tap to switch program, `＋` chip to create one. Programs are renamed/duplicated/deleted from the program **⋯ menu**, which also has **"Bloc suivant (progression)"** (§9) and **"Nouveau programme"**.
 - **Weeks** — each week is a collapsible section (▼/▶) showing its workout count. Week **⋯ menu**: Renommer / Dupliquer / Supprimer. `＋ Semaine` adds one.
-- **Workout cards** — each séance card shows its name, a preview of its first exercises, the **estimated duration + Stress Index** (§5b), and a **progress bar** (logged sets / total). Tap the card body to open its editor; the blue **▶** button runs it. `＋ Séance` adds a workout to that week. Week headers also show the **week's total Stress Index**.
+- **Workout cards** — each séance card shows its name, a preview of its first exercises, the **estimated duration + Stress Index** (§5b), and a **status line**: a live progress bar while it's the **running** séance, otherwise **✓ last-session date + set count** (from `S.sessions`), or *à faire / à planifier*. Tap the card body to open its editor; the blue **▶** button runs it. `＋ Séance` adds a workout to that week. Week headers also show the **week's total Stress Index**.
 - **Drag & drop** (via the `⋮⋮` grips): reorder **workouts** within a week, **move workouts across weeks**, and reorder **weeks**. A floating "ghost" + accent **drop-line** indicate the target, and the board **auto-scrolls** when you drag near the top/bottom edge.
 
 ---
@@ -141,16 +147,17 @@ Link consecutive exercises into a superset with **⛓ lier** (and **⛓ délier*
 
 ## 8. Running a workout
 
-Start a workout from a card's **▶** (on the board or an edit-all column — the editor has no run button). The run view focuses on logging:
+Start a workout from a card's **▶** (on the board or an edit-all column — the editor has no run button). The run view focuses on logging.
 
+- **Plan ⟂ execution (decoupled)** — a run operates on a private **draft** copied from the plan's targets; **it never modifies the saved program**. On **Terminer & enregistrer** the draft's completed sets are written as one **Session** in `S.sessions` (§10). Re-running the same séance another day produces another, separate session — your plan stays a clean template and history accumulates.
 - **± steppers** on load and reps (no keyboard needed); RPE is a direct input. Load step = the rounding setting; reps step = 1.
 - **Plate calculator** — for each set, shows the plates **per side** for the target/actual load given the configured **bar weight** (chips, e.g. `25 25 2.5 / côté`). Greedy from `[25, 20, 15, 10, 5, 2.5, 1.25]`.
-- **"Last time" reference** — `↺ <date> : <top set>` from your most recent previous session for that exercise (or muscle slot), so you can progress at a glance.
-- **Rest timer** — checking a set off **auto-starts** a countdown using that exercise's **rest** (or the 120 s default; `−15 / +15 / Passer`), with **vibration + beep** at zero. The "Terminer" button always scrolls clear of the timer bar.
+- **"Last time" reference** — `↺ <date> : <top set>` from your most recent **session** for that exercise. A **joker slot** also shows `↺ <date> · <exercise> <load>×<reps>` for that **muscle** (whatever filled it last time), and the run-time chooser annotates each candidate with its last result.
+- **Clear "set done" state** — a completed set's row turns green with an accent border, an enlarged ✓, and the target line struck through.
+- **Rest timer** — checking a set off **auto-starts** a countdown using that exercise's **rest** (or the 120 s default; `−15 / +15 / Passer`). It is **deadline-based**, so it stays accurate across screen-lock / app-backgrounding (it re-syncs on return to the foreground). At zero: **vibration + a triple beep** (one shared `AudioContext`, unlocked on first tap) and, if enabled, an **OS notification** (§13). The "Terminer" button always scrolls clear of the timer bar.
 - **Wake lock** — the screen stays on during a workout (released on leaving / finishing).
-- **Haptics** — a short buzz when a set is completed.
-- **Checking a set** fills its actuals from the plan if blank, stamps the date, updates the progress bar, and shows the live **e1RM**.
-- **Terminer & enregistrer** finalises the session and returns to the board.
+- **Checking a set** fills its actuals from the plan target if blank, updates the progress bar, and shows the live **e1RM**.
+- **Muscle joker** — pick the exercise at run time (or keep it generic); the choice lives on the draft only and is recorded in the session.
 
 Cardio runs log **min / km**; carries log **kg / m** — both against the planned targets.
 
@@ -167,6 +174,7 @@ Cardio runs log **min / km**; carries log **kg / m** — both against the planne
 
 Computed from your **logged** sets. **Estimated 1RM** uses the **Tuchscherer / RTS RPE→%1RM chart** (`e1RM = load ÷ (chart[reps][RPE] / 100)`), falling back to **Epley** (`load × (1 + reps/30)`) when a set is outside the table (reps > 12, or no logged RPE).
 
+- **Séances récentes (historique d'exécution)** — a reverse-chronological list of your stored sessions; tap one to see every exercise and the exact sets you logged (kg×reps@RPE / min·km / kg·m, with e1RM), plus a **Supprimer cette séance** action (undoable). Every stat below is computed from these sessions (`loggedSets()` flattens them — the single source of truth).
 - **Poids de corps** — log today's bodyweight + a date-accurate line chart; relative strength uses the latest value.
 - **Score DOTS / Wilks** — from the best logged e1RM of squat + bench + deadlift (by `lift` tag) and latest bodyweight + sex. Both coefficient sets are implemented (men/women).
 - **Records (e1RM estimé)** — best estimated 1RM per main lift, with **× bodyweight** relative strength; tap through to the exercise's history.
@@ -194,7 +202,7 @@ Optional, configured in **Données → Synchronisation cloud**.
 ## 12. PWA & offline
 
 - **Installable** ("Add to Home Screen" / Install) via the manifest; opens standalone with the theme colour and the beagle icon.
-- **Service worker** (`sw.js`) caches the app shell: navigations are **network-first** (so deploys are picked up) with an offline cache fallback; same-origin assets are cache-first; the jsonbin API is never cached.
+- **Service worker** (`sw.js`) caches the app shell: navigations are **network-first** (so deploys are picked up) with an offline cache fallback; same-origin assets are cache-first; the jsonbin API is never cached. It also handles **`notificationclick`** (focus/open the app) for rest-end notifications.
 - **Update prompt** — when a new version is deployed, a **"Nouvelle version disponible — Recharger"** snackbar (its own `#updbar`) lets you activate it immediately (no silent swaps). The SW is skipped under Cypress.
 - **Icon** — a gritty old-school gym **badge** (beagle gripping a barbell), generated as 192/512 + maskable PNGs.
 
@@ -203,16 +211,17 @@ Optional, configured in **Données → Synchronisation cloud**.
 ## 13. Data management & UX
 
 - **In-app modals** replace all native `prompt()/confirm()` — bottom-sheet prompt, confirm, and a searchable chooser. Pop-over **⋯ menus** for program/week/workout actions.
-- **Undo** — destructive actions (delete program/week/séance/exercise/série, restore a version) snapshot state and show an **Annuler** snackbar (~6 s).
+- **Undo** — destructive actions (delete program/week/séance/exercise/série, **delete a session**, restore a version) snapshot state and show an **Annuler** snackbar (~6 s).
+- **Phone Back button** — the hardware/browser **Back** gesture pops the **topmost layer** (open modal → pop-over menu → run / editor / stat-detail → board) instead of leaving the app, via the History API (a single "trap" entry kept in sync with whatever's open).
 - **Backups** — **Exporter (JSON)** / **Importer** a full backup, and **Exporter les séries (CSV)** of all logged sets. **Réinitialiser tout** restores the example.
-- **Settings** (Données) — sex (for DOTS/Wilks), load rounding (1 / 2.5 / 5 kg), bar weight (for plates), default rest duration.
+- **Settings** (Données) — sex (for DOTS/Wilks), load rounding (1 / 2.5 / 5 kg), bar weight (for plates), default rest duration, and a **🔔 rest-end notification** toggle (requests OS permission on enable; fires a notification + sound + vibration when the timer hits 0, even backgrounded on Android — `notificationclick` focuses the app; iOS PWAs get the sound/vibration only).
 
 ---
 
 ## 14. Deployment & testing
 
 - **Deploy** — GitHub Pages serves the repo root on `main`; pushing to `main` auto-deploys to the live URL. (This is a personal repo: ship by pushing to `main`, no PR.)
-- **E2E tests** — Cypress (`cypress/e2e/app.cy.js`) covers each feature area: board/programs, weeks & workouts (incl. the workout-delete regression), the editor (sets, exercises, modifiers, supersets), running, stats, données/library, *Tout éditer*, muscle wildcards, and the planning extras (stress index, duration estimate, per-exercise rest, AMRAP reps, distance×charge carries, edit-all exercise reordering). Run with `npm install` then `npm run e2e` (serves the app and runs headless).
+- **E2E tests** — Cypress (`cypress/e2e/app.cy.js`) covers each feature area: board/programs, weeks & workouts (incl. the workout-delete regression), the editor (sets, exercises, modifiers, supersets), running, stats, données/library, *Tout éditer*, muscle wildcards, the planning extras (stress index, duration estimate, per-exercise rest, AMRAP reps, distance×charge carries, edit-all exercise reordering), and the execution model (a finished run stores a **session** without mutating the plan, the Stats **history** list + session detail, the **set-done** class, **joker history**, and **phone Back** returning to the board from a run/editor). Run with `npm install` then `npm run e2e` (serves the app and runs headless). 39 specs.
 
 ---
 

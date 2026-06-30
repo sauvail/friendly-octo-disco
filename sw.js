@@ -1,5 +1,5 @@
 /* Service worker — offline app shell. Bump CACHE to force-refresh clients after a deploy. */
-const CACHE = "suivi-muscu-v2";
+const CACHE = "suivi-muscu-v3";
 const ASSETS = [
   "./",
   "./index.html",
@@ -14,6 +14,17 @@ self.addEventListener("install", e => {
 });
 // Page asks us to activate the new version immediately when the user taps "Recharger".
 self.addEventListener("message", e => { if (e.data && e.data.type === "skipWaiting") self.skipWaiting(); });
+
+// Tapping the end-of-rest notification focuses (or opens) the app.
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(cls => {
+      for (const c of cls) { if ("focus" in c) return c.focus(); }
+      if (self.clients.openWindow) return self.clients.openWindow("./");
+    })
+  );
+});
 
 self.addEventListener("activate", e => {
   e.waitUntil(

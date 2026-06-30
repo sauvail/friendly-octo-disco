@@ -286,3 +286,74 @@ describe("Stress index, duration, rest, AMRAP, carry, edit-all drag", () => {
     cy.get(".editcol .grip").should("exist");
   });
 });
+
+describe("Sessions, history, phone Back, done-state, joker history", () => {
+  // A finished run is stored as a separate session and must NOT mutate the saved plan.
+  it("stores a session on finish and leaves the plan's planned load untouched", () => {
+    cy.openWorkout("Séance A");
+    cy.get('input[data-f="load"]').first().invoke("val").then((planned) => {
+      cy.get(".crumb a").first().click(); // back to board
+      cy.contains(".wcard", "Séance A").find(".runbtn").click();
+      cy.get(".chk").first().click(); // log the first set
+      cy.contains("Terminer & enregistrer").click();
+      cy.contains(".wcard", "Séance A").should("contain", "série"); // card shows a completed-session line
+      cy.openWorkout("Séance A");
+      cy.get('input[data-f="load"]').first().should("have.value", planned); // plan unchanged
+    });
+  });
+
+  it("set-done state adds the .done class during a run", () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.get(".setline").first().find(".chk").click();
+    cy.get(".setline.done").should("exist");
+  });
+
+  it("lists the finished session in Stats and shows its logged sets", () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.get(".chk").first().click();
+    cy.contains("Terminer & enregistrer").click();
+    cy.get(".wcard").should("exist");
+    cy.tab("Stats");
+    cy.contains("h2", "Séances récentes");
+    cy.contains(".card", "Séance A").click(); // open the session detail
+    cy.contains("Série 1");
+    cy.contains("button", "Supprimer cette séance");
+  });
+
+  it("phone Back returns to the board from a run", () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains("#app h1", "Séance A");
+    cy.go("back");
+    cy.contains("button", "Tout éditer").should("exist"); // back on the board
+    cy.get(".wcard").should("exist");
+  });
+
+  it("phone Back returns to the board from the editor", () => {
+    cy.openWorkout("Séance A");
+    cy.contains("#app h1", "Séance A");
+    cy.go("back");
+    cy.contains("button", "Tout éditer").should("exist");
+  });
+
+  // A joker slot surfaces what was done for that muscle last time, drawn from session history.
+  it("shows joker-slot history after a logged session", () => {
+    cy.openWorkout("Séance A");
+    cy.contains("button", "Exercice").click();
+    cy.get("#m_s").type("Biceps");
+    cy.get(".mlist button").contains("Biceps").click(); // add a 💪 Biceps joker
+    cy.get(".crumb a").first().click(); // board
+    // run 1 — fill the joker with a new exercise + a load, log it, finish
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains(".card", "💪 Biceps").contains("button", "choisir").click();
+    cy.get("#m_new").click(); // ＋ Nouvel exercice (Biceps)
+    cy.get("#m_i").type("Curl test");
+    cy.get("#m_o").click();
+    cy.contains(".card", "Curl test").find('input[data-f="aLoad"]').first().type("20");
+    cy.contains(".card", "Curl test").find(".chk").first().click();
+    cy.contains("Terminer & enregistrer").click();
+    cy.get(".wcard").should("exist");
+    // run 2 — the joker now shows a "dernière fois" history line
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains(".card", "💪 Biceps").find(".lasttime").should("exist");
+  });
+});
