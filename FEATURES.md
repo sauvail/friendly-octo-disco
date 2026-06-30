@@ -25,7 +25,7 @@ A complete, detailed reference of every feature in the app, for future developme
 S = {
   v: 2,                       // schema version
   updatedAt: ISO string,      // bumped on every change → drives last-write-wins sync
-  settings: { round, sex, bar, rest, notify },   // notify = end-of-rest OS notification opt-in
+  settings: { round, sex, bar, rest, notify, theme },   // notify = rest notif; theme = "dark"|"light"
   exercises: [ Exercise ],    // the library
   bodyweight: [ { id, date, kg } ],
   sessions: [ Session ],      // recorded executions (decoupled from the plan) — see §8/§10
@@ -151,6 +151,8 @@ Start a workout from a card's **▶** (on the board or an edit-all column — th
 
 - **Plan ⟂ execution (decoupled)** — a run operates on a private **draft** copied from the plan's targets; **it never modifies the saved program**. On **Terminer & enregistrer** the draft's completed sets are written as one **Session** in `S.sessions` (§10). Re-running the same séance another day produces another, separate session — your plan stays a clean template and history accumulates.
 - **± steppers** on load and reps (no keyboard needed); RPE is a direct input. Load step = the rounding setting; reps step = 1.
+- **RPE → load suggestion** — for an **RPE-only set** (planned by reps + target RPE, no preset load), the run suggests a working kg = `best e1RM(exercise) × RPE_PCT[reps][RPE]/100`, shown as a tap-to-fill 💡 hint (`suggestLoad`). It also seeds the input placeholder, the plate calc, the ± stepper base, and auto-fills when you tick the set off. Needs prior logged history for that exercise.
+- **Warm-up ramp** — for a loaded exercise, a `🔥 Échauffement : bar · …` line ramps ~40/55/70/85 % to the working load (`warmupRamp`).
 - **Plate calculator** — for each set, shows the plates **per side** for the target/actual load given the configured **bar weight** (chips, e.g. `25 25 2.5 / côté`). Greedy from `[25, 20, 15, 10, 5, 2.5, 1.25]`.
 - **"Last time" reference** — `↺ <date> : <top set>` from your most recent **session** for that exercise. A **joker slot** also shows `↺ <date> · <exercise> <load>×<reps>` for that **muscle** (whatever filled it last time), and the run-time chooser annotates each candidate with its last result.
 - **Clear "set done" state** — a completed set's row turns green with an accent border, an enlarged ✓, and the target line struck through.
@@ -174,7 +176,8 @@ Cardio runs log **min / km**; carries log **kg / m** — both against the planne
 
 Computed from your **logged** sets. **Estimated 1RM** uses the **Tuchscherer / RTS RPE→%1RM chart** (`e1RM = load ÷ (chart[reps][RPE] / 100)`), falling back to **Epley** (`load × (1 + reps/30)`) when a set is outside the table (reps > 12, or no logged RPE).
 
-- **Séances récentes (historique d'exécution)** — a reverse-chronological list of your stored sessions; tap one to see every exercise and the exact sets you logged (kg×reps@RPE / min·km / kg·m, with e1RM), plus a **Supprimer cette séance** action (undoable). The heading is **always shown** — before your first finished run it displays a placeholder so you know where history will appear. Every stat below is computed from these sessions (`loggedSets()` flattens them — the single source of truth).
+- **Séances récentes (historique d'exécution)** — a reverse-chronological list of your stored sessions; tap one to see every exercise and the exact sets you logged (kg×reps@RPE / min·km / kg·m, with e1RM), plus a **Supprimer cette séance** action (undoable). The heading is **always shown** — before your first finished run it displays a placeholder so you know where history will appear. Each logged set also stores its **plan target** (`t`), so the detail shows **planned vs actual** ("cible …") wherever you deviated. Every stat below is computed from these sessions (`loggedSets()` flattens them — the single source of truth).
+- **Séries par muscle (7 j)** — working sets per muscle group over the last 7 days (from muscle tags), with a colour-coded bar and a hypertrophy guide range (~10–20 sets/muscle/week): orange = under, green = in range, red = over.
 - **Poids de corps** — log today's bodyweight + a date-accurate line chart; relative strength uses the latest value.
 - **Score DOTS / Wilks** — from the best logged e1RM of squat + bench + deadlift (by `lift` tag) and latest bodyweight + sex. Both coefficient sets are implemented (men/women).
 - **Records (e1RM estimé)** — best estimated 1RM per main lift, with **× bodyweight** relative strength; tap through to the exercise's history.
@@ -213,8 +216,9 @@ Optional, configured in **Données → Synchronisation cloud**.
 - **In-app modals** replace all native `prompt()/confirm()` — bottom-sheet prompt, confirm, and a searchable chooser. Pop-over **⋯ menus** for program/week/workout actions.
 - **Undo** — destructive actions (delete program/week/séance/exercise/série, **delete a session**, restore a version) snapshot state and show an **Annuler** snackbar (~6 s).
 - **Phone Back button** — the hardware/browser **Back** gesture pops the **topmost layer** (open modal → pop-over menu → run / editor / stat-detail → board) instead of leaving the app, via the History API (a single "trap" entry kept in sync with whatever's open).
+- **Visual polish** — exercise cards carry a **muscle-coloured left accent** (`muscleColor`, a stable hue per muscle) for fast scanning; line charts have **gridlines + a mid-value label** and use theme variables; a first-run **onboarding hint** on the board points to ▶ and the Stats history until you log your first session.
 - **Backups** — **Exporter (JSON)** / **Importer** a full backup, and **Exporter les séries (CSV)** of all logged sets. **Réinitialiser tout** restores the example.
-- **Settings** (Données) — sex (for DOTS/Wilks), load rounding (1 / 2.5 / 5 kg), bar weight (for plates), default rest duration, and a **🔔 rest-end notification** toggle (requests OS permission on enable; fires a notification + sound + vibration when the timer hits 0, even backgrounded on Android — `notificationclick` focuses the app; iOS PWAs get the sound/vibration only).
+- **Settings** (Données) — a **Thème** switch (dark / light, via `body.light` CSS-variable overrides), sex (for DOTS/Wilks), load rounding (1 / 2.5 / 5 kg), bar weight (for plates), default rest duration, and a **🔔 rest-end notification** toggle (requests OS permission on enable; fires a notification + sound + vibration when the timer hits 0, even backgrounded on Android — `notificationclick` focuses the app; iOS PWAs get the sound/vibration only).
 
 ---
 

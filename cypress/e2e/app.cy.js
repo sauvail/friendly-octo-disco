@@ -454,3 +454,57 @@ describe("Phone Back layers, session delete, rest timer, notifications", () => {
     cy.get('input[type="checkbox"]').should("be.checked"); // persisted in settings + re-rendered
   });
 });
+
+describe("Upgrades: load suggestion, muscle volume, planned-vs-actual, warm-up, theme", () => {
+  it("suggests a working load from RPE history on load-less sets", () => {
+    // give Rowing (planned load is empty) an e1RM by logging it once
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains(".card", "Rowing").find('input[data-f="aLoad"]').first().type("60");
+    cy.contains(".card", "Rowing").find(".chk").first().click();
+    cy.contains("Terminer & enregistrer").click();
+    cy.get(".wcard").should("exist");
+    // re-run → the RPE-only Rowing sets now show a tappable load suggestion
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains(".card", "Rowing").find(".suggbtn").first().should("exist").click();
+    cy.contains(".card", "Rowing").find('input[data-f="aLoad"]').first().should("not.have.value", "");
+  });
+
+  it("shows weekly sets-per-muscle after logging", () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.get(".chk").first().click(); // log a squat set (→ Quadriceps)
+    cy.contains("Terminer & enregistrer").click();
+    cy.tab("Stats");
+    cy.contains("h2", "Séries par muscle");
+  });
+
+  it("records planned vs actual in the session detail", () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains(".card", "Rowing").find('input[data-f="aLoad"]').first().type("60"); // actual ≠ plan (empty)
+    cy.contains(".card", "Rowing").find(".chk").first().click();
+    cy.contains("Terminer & enregistrer").click();
+    cy.tab("Stats");
+    cy.contains(".card", "Séance A").click();
+    cy.contains("cible"); // target shown next to the logged set
+  });
+
+  it("shows a warm-up ramp for a loaded exercise in the run", () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains(".card", "Squat").find(".warmup").should("exist"); // squat is loaded (125 kg)
+  });
+
+  it("colour-codes exercise cards by muscle in the editor", () => {
+    cy.openWorkout("Séance A");
+    cy.get('.card[style*="border-left"]').should("exist");
+  });
+
+  it("shows an onboarding hint before the first session", () => {
+    cy.get(".hint").should("exist"); // fresh board, no sessions yet
+  });
+
+  it("toggles a light theme from Données", () => {
+    cy.get("body").should("not.have.class", "light");
+    cy.tab("Données");
+    cy.contains("label", "Thème").next("select").select("light");
+    cy.get("body").should("have.class", "light");
+  });
+});
