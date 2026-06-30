@@ -285,6 +285,14 @@ describe("Stress index, duration, rest, AMRAP, carry, edit-all drag", () => {
     cy.get('.editcol [data-drag="ex"]').should("exist");
     cy.get(".editcol .grip").should("exist");
   });
+
+  it("updates the editor stress/duration live when a set is modified", () => {
+    cy.openWorkout("Séance A");
+    cy.get(".planmeta").first().should("contain", "stress").invoke("text").then((before) => {
+      cy.get('input[data-f="load"]').first().clear().type("300");
+      cy.get(".planmeta").first().invoke("text").should("not.equal", before); // stress recomputed in place
+    });
+  });
 });
 
 describe("Sessions, history, phone Back, done-state, joker history", () => {

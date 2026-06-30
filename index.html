@@ -401,6 +401,12 @@ function weekStress(w){return w.days.reduce((t,d)=>t+workoutStress(d),0);}
 const WORK_PER_SET=35;
 function estDuration(d){let sec=0;d.items.forEach(it=>{const rest=it.rest!=null?+it.rest:(S.settings.rest||120);it.sets.forEach(()=>{sec+=rest+WORK_PER_SET;});});return sec;}
 function fmtDur(sec){return Math.round(sec/60)+" min";}
+/* editor/edit-all header text — refreshed in place while typing (no full re-render, keeps focus) */
+function planMetaText(d){return `≈ ${fmtDur(estDuration(d))} · stress ${workoutStress(d)}`;}
+function refreshPlanMeta(wi,di){
+  const el=document.querySelector('.planmeta[data-mwi="'+wi+'"][data-mdi="'+di+'"]');
+  if(el)el.textContent=planMetaText(wk(wi,di));
+}
 const fmt=v=>v==null||v===""?"–":(""+v).replace(/\.0$/,"");
 const isMain=ex=>ex&&ex.category==="Principal";
 const curP=()=>S.programs[curPi];
@@ -662,7 +668,7 @@ function viewEditor(){
   return `<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a> › ${esc(w.name)}</div>
     <div class="row between"><h1 style="margin:0">${esc(d.name)}</h1>
       <button class="iconbtn" onclick="workoutMenu(event,${edit.wi},${edit.di})">⋯</button></div>
-    <div class="mut mb">≈ ${fmtDur(estDuration(d))} · stress ${workoutStress(d)} · plan : kg · reps · RPE</div>`+
+    <div class="mut mb"><span class="planmeta" data-mwi="${edit.wi}" data-mdi="${edit.di}">${planMetaText(d)}</span> · plan : kg · reps · RPE</div>`+
     itemsEditorHtml(edit.wi,edit.di,true);
 }
 function viewEditAll(){
@@ -671,7 +677,7 @@ function viewEditAll(){
   p.weeks.forEach((w,wi)=>w.days.forEach((d,di)=>{
     cols+=`<div class="editcol">
       <div class="row between mb" style="gap:6px;align-items:flex-start">
-        <div style="min-width:0"><div class="mut">${esc(w.name)}</div><div style="font-weight:700;font-size:16px">${esc(d.name)}</div><div class="mut">≈ ${fmtDur(estDuration(d))} · stress ${workoutStress(d)}</div></div>
+        <div style="min-width:0"><div class="mut">${esc(w.name)}</div><div style="font-weight:700;font-size:16px">${esc(d.name)}</div><div class="mut"><span class="planmeta" data-mwi="${wi}" data-mdi="${di}">${planMetaText(d)}</span></div></div>
         <div class="row" style="gap:4px;flex:none"><button class="runbtn2" onclick="openRun(${wi},${di})">▶</button><button class="iconbtn" onclick="workoutMenu(event,${wi},${di})">⋯</button></div>
       </div>`+itemsEditorHtml(wi,di,false)+`</div>`;
   }));
@@ -1413,14 +1419,14 @@ document.addEventListener("input",e=>{
     const set=wk(+t.dataset.wi,+t.dataset.di).items[+t.dataset.ei].sets[+t.dataset.si];const f=t.dataset.f;
     if(f==="load")set.load=num();
     else set[f]=num();
-    persist();
+    persist();refreshPlanMeta(+t.dataset.wi,+t.dataset.di);   // live stress/duration update
   }else if(k==="log"){
     // run actuals live on the ephemeral draft — saved into a session only on "Terminer"
     const dr=runWorkout();if(!dr)return;
     const set=dr.items[+t.dataset.ei].sets[+t.dataset.si];
     set[t.dataset.f]=num();
   }else if(k==="rest"){
-    const it=wk(+t.dataset.wi,+t.dataset.di).items[+t.dataset.ei];it.rest=v===""?null:Math.max(0,Math.round(+v.replace(",",".")));persist();
+    const it=wk(+t.dataset.wi,+t.dataset.di).items[+t.dataset.ei];it.rest=v===""?null:Math.max(0,Math.round(+v.replace(",",".")));persist();refreshPlanMeta(+t.dataset.wi,+t.dataset.di);
   }else if(k==="orm"){
     const ex=exById(t.dataset.id);ex.orm=v===""?0:+v.replace(",",".");persist();
   }else if(k==="exname"){
