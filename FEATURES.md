@@ -87,7 +87,7 @@ The Programme tab shows the selected program as a **vertical kanban**.
 
 ## 3. Workout editor
 
-Two ways to edit, sharing one renderer (`itemsEditorHtml(wi, di, …)`), so they always stay in sync. Each editor header shows the séance's **estimated duration** and **Stress Index** (you run workouts from the board's ▶ — the editor itself has no "Démarrer" button):
+Two ways to edit, sharing one renderer (`itemsEditorHtml(wi, di, …)`), so they always stay in sync. Each editor header shows the séance's **estimated duration** and **Stress Index**, and **every exercise card shows its own Stress Index** (both update live as you change reps/RPE). You run workouts from the board's ▶ — the editor itself has no "Démarrer" button:
 
 - **Single séance** — tap a workout card. Header has the name and a **⋯ menu** (rename/duplicate/delete). Exercises can be reordered by drag.
 - **Tout éditer (multi-column)** — the **"✎ Tout éditer les séances"** button on the board opens *every* séance of the program as **side-by-side editable columns**. The strip breaks out to the **full viewport width**, so a wide screen shows them all at once; on mobile the columns are ~86 % wide with **scroll-snap** so you swipe between them. Each column has its own ▶ run and ⋯ menu, and **exercises can be dragged to reorder within their column**.
@@ -116,7 +116,7 @@ Sets are planned in **absolute kg + reps + RPE**. (The previous **%1RM / "1RM de
 
 To balance a program, every workout shows two **planning** metrics — on the board card, the week header, and the editor header — computed from the **planned** sets (not from logging):
 
-- **Stress Index** — an RTS-style training-stress number. RTS's exact formula is proprietary, so this is a transparent **exertion-load** equivalent: each rep is weighted by its proximity to failure (reps-in-reserve) — `setStress = load × Σ_reps e^(−0.215 · RIR_rep)` — summed per **workout** and per **week**. Heavier / higher-rep / closer-to-failure work scores more; cardio & carry are excluded (no rep×RPE structure); AMRAP sets assume a nominal 8 reps for the estimate.
+- **Stress Index** — the RTS training-stress number, read from a **reps × target-RPE lookup table** (`SI_RPE`, reps 1–20 × RPE 6–10 in ½ steps). It is **load-independent** — it measures effort/fatigue, so **RPE-only programming** (planning by reps + target RPE with no preset load) still scores. Per set = `SI_RPE[RPE][reps]`; shown **per exercise** (in each exercise card) and summed **per workout** and **per week**. Defaults: blank RPE → 8; reps clamped to 1–20; AMRAP → nominal 8 reps. Cardio/carry sets have no reps so they score 0.
 - **Estimated duration** — `Σ over sets of (exercise rest + ~35 s work)`, using each exercise's rest (or the default). Shown as `≈ N min`.
 
 ---
@@ -228,7 +228,7 @@ Optional, configured in **Données → Synchronisation cloud**.
 ## Formula reference
 
 - **Estimated 1RM (RTS RPE chart):** `e1RM = load ÷ (chart[reps][RPE] / 100)` using the Tuchscherer / Reactive Training Systems RPE→%1RM table (reps 1–12 × RPE 6–10, half-RPE steps). **Epley** (`load × (1 + reps / 30)`) is the fallback outside the table.
-- **Stress Index (exertion-load proxy):** per planned set, `setStress = load × Σ_reps e^(−0.215 · RIR_rep)`, where `RIR_rep` is the reps-in-reserve of each rep (final RIR = `10 − RPE`, counting up for earlier reps); summed over a séance and a week, shown only while **building** a program. *(RTS's exact Stress Index formula is proprietary; this is a transparent equivalent.)*
+- **Stress Index (RTS table):** per planned set = `SI_RPE[target RPE][reps]`, a reps (1–20) × RPE (6–10, ½ steps) lookup — **load-independent** (effort-based, so RPE-only plans score). Summed per **exercise**, **workout** and **week**, shown only while **building** a program. Blank RPE defaults to 8; AMRAP counts as a nominal 8 reps.
 - **Duration estimate:** `Σ over sets (rest + 35 s work)`, using each exercise's `rest` (or the default), shown on cards and editors.
 - **DOTS:** `500 / (A + B·bw + C·bw² + D·bw³ + E·bw⁴) × total`, with separate men/women coefficients; total = best e1RM of S + B + D.
 - **Wilks:** `500 / (a + b·bw + … + f·bw⁵) × total`, men/women coefficients.

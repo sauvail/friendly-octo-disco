@@ -286,11 +286,21 @@ describe("Stress index, duration, rest, AMRAP, carry, edit-all drag", () => {
     cy.get(".editcol .grip").should("exist");
   });
 
-  it("updates the editor stress/duration live when a set is modified", () => {
+  it("updates the editor stress/duration live when reps change", () => {
     cy.openWorkout("Séance A");
     cy.get(".planmeta").first().should("contain", "stress").invoke("text").then((before) => {
-      cy.get('input[data-f="load"]').first().clear().type("300");
+      cy.get('input[data-f="reps"]').first().clear().type("12");
       cy.get(".planmeta").first().invoke("text").should("not.equal", before); // stress recomputed in place
+    });
+  });
+
+  it("shows a per-exercise Stress Index that is load-independent (RPE-driven)", () => {
+    cy.openWorkout("Séance A");
+    cy.get(".exstress").first().should("contain", "stress").invoke("text").then((before) => {
+      cy.get('input[data-f="load"]').first().clear().type("999"); // load change → stress unchanged
+      cy.get(".exstress").first().should("have.text", before);
+      cy.get('input[data-f="rpe"]').first().clear().type("10"); // RPE change → stress changes
+      cy.get(".exstress").first().invoke("text").should("not.equal", before);
     });
   });
 });

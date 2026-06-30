@@ -392,20 +392,45 @@ const RPE_PCT={
 };
 function rpePct(reps,rpe){reps=Math.round(reps);if(reps<1||reps>12||rpe==null)return null;let r=Math.round(rpe*2)/2;if(r>10)r=10;if(r<6)r=6;const row=RPE_PCT[reps];return row?row[r]:null;}
 function e1rm(load,reps,rpe){if(!load||!reps)return null;const p=rpePct(reps,rpe);if(p)return Math.round(load/(p/100)*10)/10;return Math.round(load*(1+reps/30)*10)/10;}
-/* RTS-style Stress Index (exertion-load model): each rep weighted by proximity to failure (reps-in-reserve), from the PLANNED set. RTS's exact formula is proprietary; this is a transparent equivalent. */
-const K_EXL=0.215;
-function setStress(set){const load=set.load!=null?+set.load:0;if(!load)return 0;let reps=set.reps==="AMRAP"?8:(+set.reps||0);if(reps<1)return 0;const rpe=set.rpe!=null?+set.rpe:8;const finalRIR=Math.max(0,10-rpe);let s=0;for(let k=0;k<reps;k++)s+=Math.exp(-K_EXL*(finalRIR+(reps-1-k)));return load*s;}
-function workoutStress(d){return Math.round(d.items.reduce((t,it)=>t+(itemIsWeight(it)?it.sets.reduce((u,s)=>u+setStress(s),0):0),0));}
+/* RTS Stress Index — a per-set value from a reps × target-RPE table. It measures effort/fatigue, so it is
+   LOAD-INDEPENDENT: RPE-only programming (no preset load) still scores. Reps 1-20 × RPE 6-10 (½ steps). */
+const SI_RPE={
+ 6:  [0.26,0.40,0.46,0.48,0.48,0.48,0.48,0.48,0.47,0.46,0.45,0.44,0.43,0.42,0.41,0.41,0.40,0.39,0.39,0.39],
+ 6.5:[0.32,0.47,0.53,0.56,0.56,0.55,0.54,0.53,0.52,0.51,0.50,0.49,0.48,0.47,0.46,0.46,0.45,0.44,0.43,0.43],
+ 7:  [0.38,0.55,0.63,0.65,0.64,0.63,0.61,0.60,0.59,0.58,0.56,0.55,0.54,0.53,0.52,0.51,0.50,0.49,0.48,0.48],
+ 7.5:[0.46,0.66,0.74,0.76,0.74,0.72,0.70,0.68,0.66,0.65,0.63,0.62,0.60,0.59,0.58,0.57,0.56,0.55,0.54,0.53],
+ 8:  [0.55,0.79,0.87,0.89,0.87,0.84,0.80,0.76,0.75,0.73,0.71,0.69,0.68,0.66,0.65,0.63,0.62,0.61,0.60,0.59],
+ 8.5:[0.68,0.95,1.04,1.04,1.01,0.96,0.92,0.87,0.85,0.82,0.80,0.78,0.76,0.74,0.72,0.71,0.69,0.68,0.67,0.66],
+ 9:  [0.85,1.14,1.24,1.22,1.18,1.12,1.06,1.00,0.95,0.93,0.90,0.87,0.85,0.83,0.81,0.79,0.77,0.76,0.74,0.73],
+ 9.5:[1.14,1.41,1.48,1.46,1.38,1.30,1.22,1.15,1.09,1.05,1.01,0.98,0.95,0.93,0.91,0.88,0.87,0.85,0.83,0.82],
+ 10: [1.51,1.75,1.78,1.73,1.61,1.52,1.42,1.32,1.24,1.17,1.15,1.11,1.07,1.04,1.02,0.99,0.97,0.95,0.93,0.91]
+};
+function setStress(set){
+  let reps=set.reps==="AMRAP"?8:Math.round(+set.reps||0);   // AMRAP → nominal 8 reps
+  if(reps<1)return 0; if(reps>20)reps=20;
+  let rpe=(set.rpe!=null&&set.rpe!=="")?+set.rpe:8;          // default target RPE 8 if blank
+  rpe=Math.round(rpe*2)/2; if(rpe<6)rpe=6; if(rpe>10)rpe=10;
+  const row=SI_RPE[rpe];
+  return row?row[reps-1]:0;
+}
+function itemStress(it){return it.sets.reduce((u,s)=>u+setStress(s),0);}   // Stress Index per exercise
+function workoutStress(d){return d.items.reduce((t,it)=>t+itemStress(it),0);}
 function weekStress(w){return w.days.reduce((t,d)=>t+workoutStress(d),0);}
+const fmtStress=x=>{const v=Math.round(x*10)/10;return Number.isInteger(v)?(v+""):v.toFixed(1);};
 /* rough workout duration: Σ over sets of (exercise rest + a fixed work allowance) */
 const WORK_PER_SET=35;
 function estDuration(d){let sec=0;d.items.forEach(it=>{const rest=it.rest!=null?+it.rest:(S.settings.rest||120);it.sets.forEach(()=>{sec+=rest+WORK_PER_SET;});});return sec;}
 function fmtDur(sec){return Math.round(sec/60)+" min";}
 /* editor/edit-all header text — refreshed in place while typing (no full re-render, keeps focus) */
-function planMetaText(d){return `≈ ${fmtDur(estDuration(d))} · stress ${workoutStress(d)}`;}
-function refreshPlanMeta(wi,di){
+function planMetaText(d){return `≈ ${fmtDur(estDuration(d))} · stress ${fmtStress(workoutStress(d))}`;}
+function refreshPlanMeta(wi,di,ei){
+  const d=wk(wi,di);
   const el=document.querySelector('.planmeta[data-mwi="'+wi+'"][data-mdi="'+di+'"]');
-  if(el)el.textContent=planMetaText(wk(wi,di));
+  if(el)el.textContent=planMetaText(d);
+  if(ei!=null){
+    const ex=document.querySelector('.exstress[data-mwi="'+wi+'"][data-mdi="'+di+'"][data-mei="'+ei+'"]');
+    if(ex)ex.textContent="stress "+fmtStress(itemStress(d.items[ei]));
+  }
 }
 const fmt=v=>v==null||v===""?"–":(""+v).replace(/\.0$/,"");
 const isMain=ex=>ex&&ex.category==="Principal";
@@ -576,7 +601,7 @@ function viewBoard(){
       <div class="weekhead">
         <span class="grip" onpointerdown="dragStart(event,'week',${wi},0)">⋮⋮</span>
         <button class="wtoggle" onclick="toggleColl('${w.id}')">${collapsed?'▶':'▼'}</button>
-        <div class="wtitle" onclick="toggleColl('${w.id}')">${esc(w.name)} <span class="mut">· ${nd} séance${nd>1?'s':''}${weekStress(w)?` · stress ${weekStress(w)}`:''}</span></div>
+        <div class="wtitle" onclick="toggleColl('${w.id}')">${esc(w.name)} <span class="mut">· ${nd} séance${nd>1?'s':''}${weekStress(w)?` · stress ${fmtStress(weekStress(w))}`:''}</span></div>
         <button class="iconbtn" onclick="weekMenu(event,${wi})">⋯</button>
       </div>`;
     if(!collapsed){
@@ -596,7 +621,7 @@ function viewBoard(){
           <div class="wcard-body" onclick="openEditor(${wi},${di})">
             <div class="wcard-title">${esc(d.name)}</div>
             <div class="mut">${d.items.length} exo${preview?` · ${esc(preview)}`:''}</div>
-            ${d.items.length?`<div class="mut">≈ ${fmtDur(estDuration(d))} · stress ${workoutStress(d)}</div>`:''}
+            ${d.items.length?`<div class="mut">≈ ${fmtDur(estDuration(d))} · stress ${fmtStress(workoutStress(d))}</div>`:''}
             ${foot}
           </div>
           <button class="runbtn" onclick="openRun(${wi},${di})" title="Démarrer">▶</button>
@@ -632,7 +657,7 @@ function itemsEditorHtml(wi,di,withDrag){
       <div class="row" style="gap:6px;flex:none">
         <button class="sm gh" onclick="toggleGroup(${wi},${di},${ei})">${g?'⛓ délier':'⛓ lier'}</button>
         <button class="sm danger" onclick="delItem(${wi},${di},${ei})">✕</button></div></div>`;
-    h+=`<div class="row mb" style="gap:6px"><span class="mut" style="min-width:46px">Repos</span><input class="restin" inputmode="numeric" placeholder="${S.settings.rest||120}" value="${it.rest!=null?it.rest:''}" data-k="rest" data-wi="${wi}" data-di="${di}" data-ei="${ei}"><span class="mut">s</span></div>`;
+    h+=`<div class="row mb" style="gap:6px"><span class="mut" style="min-width:46px">Repos</span><input class="restin" inputmode="numeric" placeholder="${S.settings.rest||120}" value="${it.rest!=null?it.rest:''}" data-k="rest" data-wi="${wi}" data-di="${di}" data-ei="${ei}"><span class="mut">s</span><span class="mut exstress" data-mwi="${wi}" data-mdi="${di}" data-mei="${ei}" style="margin-left:auto">stress ${fmtStress(itemStress(it))}</span></div>`;
     h+=`${(it.mods&&it.mods.length)?`<div class="mods">`+it.mods.map((m,mi)=>`<span class="modchip">${esc(modText(m))} <b onclick="delMod(${wi},${di},${ei},${mi})">✕</b></span>`).join("")+`</div>`:''}<button class="full sm gh mb" onclick="addMod(${wi},${di},${ei})">+ modificateur</button>`;
     h+= cardio ? `<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`
       : carry ? `<div class="setrow"><div></div><div class="lab">KG</div><div class="lab">MÈTRES</div><div></div><div></div></div>`
@@ -1419,7 +1444,7 @@ document.addEventListener("input",e=>{
     const set=wk(+t.dataset.wi,+t.dataset.di).items[+t.dataset.ei].sets[+t.dataset.si];const f=t.dataset.f;
     if(f==="load")set.load=num();
     else set[f]=num();
-    persist();refreshPlanMeta(+t.dataset.wi,+t.dataset.di);   // live stress/duration update
+    persist();refreshPlanMeta(+t.dataset.wi,+t.dataset.di,+t.dataset.ei);   // live stress (set + workout) / duration
   }else if(k==="log"){
     // run actuals live on the ephemeral draft — saved into a session only on "Terminer"
     const dr=runWorkout();if(!dr)return;
