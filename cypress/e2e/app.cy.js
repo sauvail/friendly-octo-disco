@@ -306,6 +306,12 @@ describe("Stress index, duration, rest, AMRAP, carry, edit-all drag", () => {
 });
 
 describe("Sessions, history, phone Back, done-state, joker history", () => {
+  it("shows a history placeholder before any session is logged", () => {
+    cy.tab("Stats");
+    cy.contains("h2", "Séances récentes"); // heading always present
+    cy.contains("Ton historique de séances"); // empty-state placeholder
+  });
+
   // A finished run is stored as a separate session and must NOT mutate the saved plan.
   it("stores a session on finish and leaves the plan's planned load untouched", () => {
     cy.openWorkout("Séance A");
@@ -419,7 +425,9 @@ describe("Phone Back layers, session delete, rest timer, notifications", () => {
     cy.contains(".card", "Séance A").click();
     cy.contains("button", "Supprimer cette séance").click();
     cy.get("#snack").should("have.class", "show"); // undo snackbar
-    cy.contains("h2", "Séances récentes").should("not.exist"); // history now empty
+    cy.contains("h2", "Séances récentes"); // heading stays…
+    cy.contains("Ton historique de séances"); // …now showing the empty-state placeholder
+    cy.contains(".card", "Séance A").should("not.exist"); // the session itself is gone
   });
 
   it("rest timer is deadline-based: counts down and auto-ends", () => {

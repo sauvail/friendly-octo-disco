@@ -174,7 +174,7 @@ Cardio runs log **min / km**; carries log **kg / m** — both against the planne
 
 Computed from your **logged** sets. **Estimated 1RM** uses the **Tuchscherer / RTS RPE→%1RM chart** (`e1RM = load ÷ (chart[reps][RPE] / 100)`), falling back to **Epley** (`load × (1 + reps/30)`) when a set is outside the table (reps > 12, or no logged RPE).
 
-- **Séances récentes (historique d'exécution)** — a reverse-chronological list of your stored sessions; tap one to see every exercise and the exact sets you logged (kg×reps@RPE / min·km / kg·m, with e1RM), plus a **Supprimer cette séance** action (undoable). Every stat below is computed from these sessions (`loggedSets()` flattens them — the single source of truth).
+- **Séances récentes (historique d'exécution)** — a reverse-chronological list of your stored sessions; tap one to see every exercise and the exact sets you logged (kg×reps@RPE / min·km / kg·m, with e1RM), plus a **Supprimer cette séance** action (undoable). The heading is **always shown** — before your first finished run it displays a placeholder so you know where history will appear. Every stat below is computed from these sessions (`loggedSets()` flattens them — the single source of truth).
 - **Poids de corps** — log today's bodyweight + a date-accurate line chart; relative strength uses the latest value.
 - **Score DOTS / Wilks** — from the best logged e1RM of squat + bench + deadlift (by `lift` tag) and latest bodyweight + sex. Both coefficient sets are implemented (men/women).
 - **Records (e1RM estimé)** — best estimated 1RM per main lift, with **× bodyweight** relative strength; tap through to the exercise's history.

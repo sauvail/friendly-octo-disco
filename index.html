@@ -1220,11 +1220,14 @@ function viewStats(){
   }
   h+=`</div>`;
   const sess=[...(S.sessions||[])].sort((a,b)=>b.ts-a.ts);
+  h+=`<h2>Séances récentes</h2>`;
   if(sess.length){
-    h+=`<h2>Séances récentes</h2>`+sess.slice(0,10).map(se=>{
+    h+=sess.slice(0,10).map(se=>{
       const n=se.entries.reduce((t,en)=>t+en.sets.length,0);
       return `<div class="card row between" onclick="openStatSess('${se.id}')"><div style="min-width:0"><div style="font-weight:600">${esc(se.dayName||'Séance')}</div><div class="mut">${se.date} · ${n} série${n>1?'s':''}</div></div><div class="mut">›</div></div>`;
     }).join("");
+  }else{
+    h+=`<div class="empty">📋 Ton historique de séances s'affichera ici.<br>Lance une séance avec ▶ puis « Terminer & enregistrer » pour l'enregistrer.</div>`;
   }
   if(!ls.length) return h+`<div class="empty">Pas encore de séries de force enregistrées.<br>Démarre une séance pour voir tes records.</div>`;
   const dt=dotsScore();
