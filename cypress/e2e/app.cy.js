@@ -240,3 +240,49 @@ describe("Muscle wildcard at run time", () => {
     cy.get(".mlist button").contains("Garder").click(); // keep it generic
   });
 });
+
+describe("Stress index, duration, rest, AMRAP, carry, edit-all drag", () => {
+  it("shows stress + duration on the board (week + card)", () => {
+    cy.get(".weekcol").first().should("contain", "stress");
+    cy.get(".wcard").first().should("contain", "stress").and("contain", "min");
+  });
+
+  it("editor: no Démarrer button; has rest input + duration + stress", () => {
+    cy.openWorkout("Séance A");
+    cy.contains("Démarrer la séance").should("not.exist");
+    cy.get('input[data-k="rest"]').should("exist");
+    cy.contains("#app .mut", "stress");
+    cy.contains("#app .mut", "min");
+  });
+
+  it("sets a per-exercise rest time that persists", () => {
+    cy.openWorkout("Séance A");
+    cy.get('input[data-k="rest"]').first().clear().type("90");
+    cy.reload();
+    cy.openWorkout("Séance A");
+    cy.get('input[data-k="rest"]').first().should("have.value", "90");
+  });
+
+  it("toggles AMRAP reps on a set", () => {
+    cy.openWorkout("Séance A");
+    cy.get(".ambtn").first().click();
+    cy.get(".amon").should("have.value", "AMRAP");
+    cy.get(".ambtn.on").should("exist");
+    cy.get(".ambtn").first().click(); // back to a number
+    cy.get(".amon").should("not.exist");
+  });
+
+  it("supports the distance×weight (carry) metric", () => {
+    cy.tab("Données");
+    cy.get(".grid3").first().find("select").eq(1).select("carry");
+    cy.tab("Programme");
+    cy.openWorkout("Séance A");
+    cy.contains(".lab", "MÈTRES");
+  });
+
+  it("allows reordering exercises in Tout éditer (grips present)", () => {
+    cy.contains("button", "Tout éditer").click();
+    cy.get('.editcol [data-drag="ex"]').should("exist");
+    cy.get(".editcol .grip").should("exist");
+  });
+});

@@ -156,6 +156,11 @@ body.running #app{padding-bottom:calc(176px + env(safe-area-inset-bottom))} /* k
 .editcol{flex:0 0 86vw;max-width:340px;scroll-snap-align:start;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px}
 @media(min-width:560px){.editcol{flex:0 0 320px}}
 .runbtn2{background:var(--acc);color:#fff;border:none;border-radius:9px;min-height:0;padding:7px 11px;font-size:14px}
+.repcell{display:flex;gap:2px;min-width:0}.repcell>input{flex:1;min-width:0}
+.ambtn{width:26px;flex:none;background:var(--card2);border:1px solid var(--line);color:var(--mut);min-height:0;padding:0;font-size:13px;border-radius:8px}
+.ambtn.on{background:var(--acc);border-color:var(--acc);color:#fff}
+.amon{color:var(--acc);font-weight:700;font-size:11px;text-align:center}
+.restin{max-width:84px}
 </style>
 </head>
 <body>
@@ -186,6 +191,7 @@ function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");cl
 
 const mkset=(load,r,rpe)=>({id:uid(),load:load,reps:r,rpe:rpe,aLoad:null,aReps:null,aRpe:null,done:false,date:null});
 const mkcardio=(dur,dist)=>({id:uid(),dur:dur,dist:dist,aDur:null,aDist:null,done:false,date:null});
+const mkcarry=(load,dist)=>({id:uid(),load:load,dist:dist,aLoad:null,aDist:null,done:false,date:null});
 
 /* ---------- exercise library [name, category, muscle, metric?, lift?] ---------- */
 const LIB=[
@@ -359,7 +365,32 @@ const roundTo=v=>{const r=S.settings.round||2.5;return Math.round(v/r)*r;};
 function plannedLoad(set,ex){
   return set.load!=null?set.load:null;
 }
-const e1rm=(load,reps)=>load&&reps?Math.round(load*(1+reps/30)*10)/10:null;
+/* Estimated 1RM via the Tuchscherer / RTS RPE→%1RM chart (reps 1-12 × RPE 6-10); Epley fallback outside the table. */
+const RPE_PCT={
+ 1:{10:100,9.5:97.8,9:95.5,8.5:93.9,8:92.2,7.5:90.7,7:89.2,6.5:87.8,6:86.3},
+ 2:{10:95.5,9.5:93.9,9:92.2,8.5:90.7,8:89.2,7.5:87.8,7:86.3,6.5:85,6:83.7},
+ 3:{10:92.2,9.5:90.7,9:89.2,8.5:87.8,8:86.3,7.5:85,7:83.7,6.5:82.4,6:81.1},
+ 4:{10:89.2,9.5:87.8,9:86.3,8.5:85,8:83.7,7.5:82.4,7:81.1,6.5:79.9,6:78.6},
+ 5:{10:86.3,9.5:85,9:83.7,8.5:82.4,8:81.1,7.5:79.9,7:78.6,6.5:77.4,6:76.2},
+ 6:{10:83.7,9.5:82.4,9:81.1,8.5:79.9,8:78.6,7.5:77.4,7:76.2,6.5:75.1,6:73.9},
+ 7:{10:81.1,9.5:79.9,9:78.6,8.5:77.4,8:76.2,7.5:75.1,7:73.9,6.5:72.8,6:71.7},
+ 8:{10:78.6,9.5:77.4,9:76.2,8.5:75.1,8:73.9,7.5:72.8,7:71.7,6.5:70.7,6:69.6},
+ 9:{10:76.2,9.5:75.1,9:73.9,8.5:72.8,8:71.7,7.5:70.7,7:69.6,6.5:68.6,6:67.6},
+ 10:{10:73.9,9.5:72.8,9:71.7,8.5:70.7,8:69.6,7.5:68.6,7:67.6,6.5:66.6,6:65.6},
+ 11:{10:71.7,9.5:70.7,9:69.6,8.5:68.6,8:67.6,7.5:66.6,7:65.6,6.5:64.7,6:63.7},
+ 12:{10:69.6,9.5:68.6,9:67.6,8.5:66.6,8:65.6,7.5:64.7,7:63.7,6.5:62.8,6:61.8}
+};
+function rpePct(reps,rpe){reps=Math.round(reps);if(reps<1||reps>12||rpe==null)return null;let r=Math.round(rpe*2)/2;if(r>10)r=10;if(r<6)r=6;const row=RPE_PCT[reps];return row?row[r]:null;}
+function e1rm(load,reps,rpe){if(!load||!reps)return null;const p=rpePct(reps,rpe);if(p)return Math.round(load/(p/100)*10)/10;return Math.round(load*(1+reps/30)*10)/10;}
+/* RTS-style Stress Index (exertion-load model): each rep weighted by proximity to failure (reps-in-reserve), from the PLANNED set. RTS's exact formula is proprietary; this is a transparent equivalent. */
+const K_EXL=0.215;
+function setStress(set){const load=set.load!=null?+set.load:0;if(!load)return 0;let reps=set.reps==="AMRAP"?8:(+set.reps||0);if(reps<1)return 0;const rpe=set.rpe!=null?+set.rpe:8;const finalRIR=Math.max(0,10-rpe);let s=0;for(let k=0;k<reps;k++)s+=Math.exp(-K_EXL*(finalRIR+(reps-1-k)));return load*s;}
+function workoutStress(d){return Math.round(d.items.reduce((t,it)=>t+(itemIsWeight(it)?it.sets.reduce((u,s)=>u+setStress(s),0):0),0));}
+function weekStress(w){return w.days.reduce((t,d)=>t+workoutStress(d),0);}
+/* rough workout duration: Σ over sets of (exercise rest + a fixed work allowance) */
+const WORK_PER_SET=35;
+function estDuration(d){let sec=0;d.items.forEach(it=>{const rest=it.rest!=null?+it.rest:(S.settings.rest||120);it.sets.forEach(()=>{sec+=rest+WORK_PER_SET;});});return sec;}
+function fmtDur(sec){return Math.round(sec/60)+" min";}
 const fmt=v=>v==null||v===""?"–":(""+v).replace(/\.0$/,"");
 const isMain=ex=>ex&&ex.category==="Principal";
 const curP=()=>S.programs[curPi];
@@ -369,6 +400,7 @@ const runWorkout=()=>S.programs[curPi].weeks[running.wi].days[running.di];
 const setProgress=d=>{const tot=d.items.reduce((s,it)=>s+it.sets.length,0);const done=d.items.reduce((s,it)=>s+it.sets.filter(x=>x.done).length,0);return{tot,done};};
 const MUSCLES=["Pectoraux","Dos","Épaules","Biceps","Triceps","Avant-bras","Quadriceps","Ischios","Fessiers","Mollets","Abdos","Lombaires","Trapèzes"];
 const itemEx=it=>it.exId?exById(it.exId):null;
+const itemIsWeight=it=>{const ex=itemEx(it);return ex?ex.metric==="weight":!!it.muscle;};
 const itemName=it=>{const ex=itemEx(it);return ex?ex.name:(it.muscle?"💪 "+it.muscle:"?");};
 const itemKey=it=>it.exId||(it.muscle?"m:"+it.muscle:null);
 const exName=id=>{if(!id)return "?";if(typeof id==="string"&&id.slice(0,2)==="m:")return "💪 "+id.slice(2);const e=exById(id);return e?e.name:"?";};
@@ -510,7 +542,7 @@ function viewBoard(){
       <div class="weekhead">
         <span class="grip" onpointerdown="dragStart(event,'week',${wi},0)">⋮⋮</span>
         <button class="wtoggle" onclick="toggleColl('${w.id}')">${collapsed?'▶':'▼'}</button>
-        <div class="wtitle" onclick="toggleColl('${w.id}')">${esc(w.name)} <span class="mut">· ${nd} séance${nd>1?'s':''}</span></div>
+        <div class="wtitle" onclick="toggleColl('${w.id}')">${esc(w.name)} <span class="mut">· ${nd} séance${nd>1?'s':''}${weekStress(w)?` · stress ${weekStress(w)}`:''}</span></div>
         <button class="iconbtn" onclick="weekMenu(event,${wi})">⋯</button>
       </div>`;
     if(!collapsed){
@@ -523,6 +555,7 @@ function viewBoard(){
           <div class="wcard-body" onclick="openEditor(${wi},${di})">
             <div class="wcard-title">${esc(d.name)}</div>
             <div class="mut">${d.items.length} exo${preview?` · ${esc(preview)}`:''}</div>
+            ${d.items.length?`<div class="mut">≈ ${fmtDur(estDuration(d))} · stress ${workoutStress(d)}</div>`:''}
             ${tot?`<div class="bar"><span style="width:${done/tot*100}%"></span></div>
               <div class="mut" style="margin-top:3px">${done}/${tot} séries${done?' faites':''}</div>`
               :`<div class="mut" style="margin-top:3px">à planifier</div>`}
@@ -547,38 +580,43 @@ function itemsEditorHtml(wi,di,withDrag){
   d.items.forEach((it,ei)=>{
     const ex=exById(it.exId);
     const wild=!ex&&it.muscle;
-    const cardio=ex&&ex.metric==="cardio";
+    const met=ex?ex.metric:"weight";
+    const cardio=met==="cardio",carry=met==="carry";
     const tagCls=isMain(ex)?"main":cardio?"cardio":"";
     const g=gl[ei];
-    h+=`<div class="card ${g?'ssitem':''}" ${withDrag?`data-drag="ex" data-ei="${ei}"`:""}><div class="row between mb">
+    h+=`<div class="card ${g?'ssitem':''}" data-drag="ex" data-ei="${ei}" data-wi="${wi}" data-di="${di}"><div class="row between mb">
       <div class="row" style="gap:6px;min-width:0">
-        ${withDrag?`<span class="grip" onpointerdown="dragStart(event,'ex',${ei},0)">⋮⋮</span>`:""}
+        <span class="grip" onpointerdown="dragStart(event,'ex',${ei},0,${wi},${di})">⋮⋮</span>
         ${g?`<span class="sslabel">${g.letter}${g.n}</span>`:''}
         <span style="font-weight:600">${esc(itemName(it))}</span>
         <span class="tag ${wild?'':tagCls}">${wild?'joker':(ex?esc(ex.category):'')}</span></div>
       <div class="row" style="gap:6px;flex:none">
         <button class="sm gh" onclick="toggleGroup(${wi},${di},${ei})">${g?'⛓ délier':'⛓ lier'}</button>
         <button class="sm danger" onclick="delItem(${wi},${di},${ei})">✕</button></div></div>`;
+    h+=`<div class="row mb" style="gap:6px"><span class="mut" style="min-width:46px">Repos</span><input class="restin" inputmode="numeric" placeholder="${S.settings.rest||120}" value="${it.rest!=null?it.rest:''}" data-k="rest" data-wi="${wi}" data-di="${di}" data-ei="${ei}"><span class="mut">s</span></div>`;
     h+=`${(it.mods&&it.mods.length)?`<div class="mods">`+it.mods.map((m,mi)=>`<span class="modchip">${esc(modText(m))} <b onclick="delMod(${wi},${di},${ei},${mi})">✕</b></span>`).join("")+`</div>`:''}<button class="full sm gh mb" onclick="addMod(${wi},${di},${ei})">+ modificateur</button>`;
-    h+= cardio
-      ? `<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`
+    h+= cardio ? `<div class="setrow"><div></div><div class="lab">MIN</div><div class="lab">KM</div><div></div><div></div></div>`
+      : carry ? `<div class="setrow"><div></div><div class="lab">KG</div><div class="lab">MÈTRES</div><div></div><div></div></div>`
       : `<div class="setrow"><div></div><div class="lab">KG</div><div class="lab">REPS</div><div class="lab">RPE</div><div></div></div>`;
     it.sets.forEach((set,si)=>{
+      const da=`data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}"`;
       if(cardio){
-        h+=`<div class="setrow">
-          <div class="lab" style="text-align:center">${si+1}</div>
-          <input inputmode="decimal" placeholder="min" value="${set.dur!=null?set.dur:''}" data-k="plan" data-f="dur" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
-          <input inputmode="decimal" placeholder="km" value="${set.dist!=null?set.dist:''}" data-k="plan" data-f="dist" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
-          <div></div>
-          <button class="sm danger" onclick="delSet(${wi},${di},${ei},${si})">✕</button></div>`;
+        h+=`<div class="setrow"><div class="lab" style="text-align:center">${si+1}</div>
+          <input inputmode="decimal" placeholder="min" value="${set.dur!=null?set.dur:''}" data-k="plan" data-f="dur" ${da}>
+          <input inputmode="decimal" placeholder="km" value="${set.dist!=null?set.dist:''}" data-k="plan" data-f="dist" ${da}>
+          <div></div><button class="sm danger" onclick="delSet(${wi},${di},${ei},${si})">✕</button></div>`;
+      }else if(carry){
+        h+=`<div class="setrow"><div class="lab" style="text-align:center">${si+1}</div>
+          <input inputmode="decimal" placeholder="kg" value="${set.load!=null?set.load:''}" data-k="plan" data-f="load" ${da}>
+          <input inputmode="decimal" placeholder="m" value="${set.dist!=null?set.dist:''}" data-k="plan" data-f="dist" ${da}>
+          <div></div><button class="sm danger" onclick="delSet(${wi},${di},${ei},${si})">✕</button></div>`;
       }else{
-        h+=`<div class="setrow">
-          <div class="lab" style="text-align:center">${si+1}</div>
-          <input inputmode="decimal" placeholder="kg" value="${set.load!=null?set.load:''}" data-k="plan" data-f="load" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
-          <input inputmode="numeric" placeholder="reps" value="${set.reps!=null?set.reps:''}" data-k="plan" data-f="reps" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
-          <input inputmode="decimal" placeholder="rpe" value="${set.rpe!=null?set.rpe:''}" data-k="plan" data-f="rpe" data-wi="${wi}" data-di="${di}" data-ei="${ei}" data-si="${si}">
-          <button class="sm danger" onclick="delSet(${wi},${di},${ei},${si})">✕</button>
-        </div>`;
+        const amrap=set.reps==="AMRAP";
+        h+=`<div class="setrow"><div class="lab" style="text-align:center">${si+1}</div>
+          <input inputmode="decimal" placeholder="kg" value="${set.load!=null?set.load:''}" data-k="plan" data-f="load" ${da}>
+          <div class="repcell">${amrap?`<input value="AMRAP" readonly class="amon">`:`<input inputmode="numeric" placeholder="reps" value="${set.reps!=null?set.reps:''}" data-k="plan" data-f="reps" ${da}>`}<button class="ambtn ${amrap?'on':''}" title="AMRAP — max de reps" onclick="toggleAmrap(${wi},${di},${ei},${si})">∞</button></div>
+          <input inputmode="decimal" placeholder="rpe" value="${set.rpe!=null?set.rpe:''}" data-k="plan" data-f="rpe" ${da}>
+          <button class="sm danger" onclick="delSet(${wi},${di},${ei},${si})">✕</button></div>`;
       }
     });
     h+=`<button class="full sm gh" onclick="addSet(${wi},${di},${ei})">+ série</button></div>`;
@@ -591,8 +629,7 @@ function viewEditor(){
   return `<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a> › ${esc(w.name)}</div>
     <div class="row between"><h1 style="margin:0">${esc(d.name)}</h1>
       <button class="iconbtn" onclick="workoutMenu(event,${edit.wi},${edit.di})">⋯</button></div>
-    <button class="full acc mb" onclick="openRun(${edit.wi},${edit.di})">▶ Démarrer la séance</button>
-    <div class="mut mb">Plan : charge (kg), reps, RPE. Le logging se fait au démarrage.</div>`+
+    <div class="mut mb">≈ ${fmtDur(estDuration(d))} · stress ${workoutStress(d)} · plan : kg · reps · RPE</div>`+
     itemsEditorHtml(edit.wi,edit.di,true);
 }
 function viewEditAll(){
@@ -601,7 +638,7 @@ function viewEditAll(){
   p.weeks.forEach((w,wi)=>w.days.forEach((d,di)=>{
     cols+=`<div class="editcol">
       <div class="row between mb" style="gap:6px;align-items:flex-start">
-        <div style="min-width:0"><div class="mut">${esc(w.name)}</div><div style="font-weight:700;font-size:16px">${esc(d.name)}</div></div>
+        <div style="min-width:0"><div class="mut">${esc(w.name)}</div><div style="font-weight:700;font-size:16px">${esc(d.name)}</div><div class="mut">≈ ${fmtDur(estDuration(d))} · stress ${workoutStress(d)}</div></div>
         <div class="row" style="gap:4px;flex:none"><button class="runbtn2" onclick="openRun(${wi},${di})">▶</button><button class="iconbtn" onclick="workoutMenu(event,${wi},${di})">⋯</button></div>
       </div>`+itemsEditorHtml(wi,di,false)+`</div>`;
   }));
@@ -664,7 +701,7 @@ function viewRun(){
   if(!d.items.length) h+=`<div class="empty">Aucun exercice dans cette séance.<br><button class="gh sm" onclick="openEditor(${running.wi},${running.di})">Planifier</button></div>`;
   const glR=groupLabels(d.items);
   d.items.forEach((it,ei)=>{
-    const ex=exById(it.exId);const wild=it.muscle&&!ex;const cardio=ex&&ex.metric==="cardio";const g=glR[ei];
+    const ex=exById(it.exId);const wild=it.muscle&&!ex;const cardio=ex&&ex.metric==="cardio";const carry=ex&&ex.metric==="carry";const g=glR[ei];
     h+=`<div class="card ${g?'ssitem':''}"><div class="row between mb">
       <div style="font-weight:600;min-width:0">${g?`<span class="sslabel">${g.letter}${g.n}</span> `:''}${esc(itemName(it))}</div>
       ${it.muscle?`<button class="sm gh" style="flex:none" onclick="chooseForMuscle(${ei})">${ex?'changer':'choisir'}</button>`:`<div class="mut">cible</div>`}</div>`;
@@ -679,6 +716,17 @@ function viewRun(){
           <div class="chk ${set.done?'on':''}" onclick="toggleDone(${ei},${si})">${set.done?'✓':''}</div>
           <input inputmode="decimal" placeholder="${set.dur!=null?set.dur:'min'}" value="${set.aDur!=null?set.aDur:''}" data-k="log" data-f="aDur" data-ei="${ei}" data-si="${si}">
           <input inputmode="decimal" placeholder="${set.dist!=null?set.dist:'km'}" value="${set.aDist!=null?set.aDist:''}" data-k="log" data-f="aDist" data-ei="${ei}" data-si="${si}">
+          <div></div><div></div>
+        </div><div class="mut" style="margin:-3px 0 8px 40px">cible ${target}</div>`;
+      });
+    }else if(carry){
+      h+=`<div class="setrow"><div></div><div class="lab">KG</div><div class="lab">M</div><div></div><div></div></div>`;
+      it.sets.forEach((set,si)=>{
+        const target=`${fmt(set.load)} kg × ${fmt(set.dist)} m`;
+        h+=`<div class="setrow">
+          <div class="chk ${set.done?'on':''}" onclick="toggleDone(${ei},${si})">${set.done?'✓':''}</div>
+          <input inputmode="decimal" placeholder="${set.load!=null?set.load:'kg'}" value="${set.aLoad!=null?set.aLoad:''}" data-k="log" data-f="aLoad" data-ei="${ei}" data-si="${si}">
+          <input inputmode="decimal" placeholder="${set.dist!=null?set.dist:'m'}" value="${set.aDist!=null?set.aDist:''}" data-k="log" data-f="aDist" data-ei="${ei}" data-si="${si}">
           <div></div><div></div>
         </div><div class="mut" style="margin:-3px 0 8px 40px">cible ${target}</div>`;
       });
@@ -702,7 +750,7 @@ function viewRun(){
               <input class="rpein" inputmode="decimal" placeholder="${set.rpe!=null?set.rpe:''}" value="${set.aRpe!=null?set.aRpe:''}" data-k="log" data-f="aRpe" data-ei="${ei}" data-si="${si}"></div>
           </div>
         </div>
-        <div class="mut" style="margin:2px 0 2px 40px">cible ${target}${set.aLoad&&set.aReps?` · e1RM ${e1rm(set.aLoad,set.aReps)}`:''}</div>
+        <div class="mut" style="margin:2px 0 2px 40px">cible ${target}${set.aLoad&&set.aReps?` · e1RM ${e1rm(set.aLoad,set.aReps,set.aRpe)}`:''}</div>
         ${pls.length?`<div class="plates">${pls.map(x=>`<span class="plate">${fmt(x)}</span>`).join("")}<span class="mut" style="font-size:11px;align-self:center">/ côté</span></div>`:''}`;
       });
     }
@@ -801,16 +849,18 @@ async function addItem(wi,di){
     const name=await modalPrompt("Nom du nouvel exercice");if(!name)return;
     ex={id:uid(),name:name.trim(),category:"Autre",metric:"weight",lift:null,orm:0};S.exercises.push(ex);
   }else{ex=exById(v);if(!ex)return;}
-  const first=ex.metric==="cardio"?mkcardio(20,null):mkset(null,5,8);
+  const first=ex.metric==="cardio"?mkcardio(20,null):ex.metric==="carry"?mkcarry(null,20):mkset(null,5,8);
   wk(wi,di).items.push({id:uid(),exId:ex.id,sets:[first]});
   persist();render();
 }
 function delItem(wi,di,ei){snapshot("Exercice retiré");wk(wi,di).items.splice(ei,1);persist();render();}
-function addSet(wi,di,ei){const it=wk(wi,di).items[ei];const ex=exById(it.exId);const last=it.sets[it.sets.length-1];
-  if(ex&&ex.metric==="cardio") it.sets.push(last?{...last,id:uid(),aDur:null,aDist:null,done:false,date:null}:mkcardio(20,null));
+function addSet(wi,di,ei){const it=wk(wi,di).items[ei];const ex=exById(it.exId);const last=it.sets[it.sets.length-1];const met=ex?ex.metric:"weight";
+  if(met==="cardio") it.sets.push(last?{...last,id:uid(),aDur:null,aDist:null,done:false,date:null}:mkcardio(20,null));
+  else if(met==="carry") it.sets.push(last?{...last,id:uid(),aLoad:null,aDist:null,done:false,date:null}:mkcarry(null,20));
   else it.sets.push(last?{...last,id:uid(),aLoad:null,aReps:null,aRpe:null,done:false,date:null}:mkset(null,5,8));
   persist();render();}
 function delSet(wi,di,ei,si){snapshot("Série retirée");const it=wk(wi,di).items[ei];it.sets.splice(si,1);persist();render();}
+function toggleAmrap(wi,di,ei,si){const set=wk(wi,di).items[ei].sets[si];set.reps=set.reps==="AMRAP"?8:"AMRAP";persist();render();}
 /* ----- supersets ----- */
 function groupLabels(items){
   const ids=[],res={},counts={};
@@ -837,20 +887,23 @@ async function addMod(wi,di,ei){
 function delMod(wi,di,ei,mi){const it=wk(wi,di).items[ei];if(!it.mods)return;it.mods.splice(mi,1);if(!it.mods.length)delete it.mods;persist();render();}
 
 /* ----- run mutations ----- */
-function toggleDone(ei,si){const it=runWorkout().items[ei];const set=it.sets[si];const ex=exById(it.exId);
+function toggleDone(ei,si){const it=runWorkout().items[ei];const set=it.sets[si];const ex=exById(it.exId);const met=ex?ex.metric:"weight";
   set.done=!set.done;
   if(set.done){
-    if(ex&&ex.metric==="cardio"){
+    if(met==="cardio"){
       if(set.aDur==null&&set.dur!=null)set.aDur=set.dur;
+      if(set.aDist==null&&set.dist!=null)set.aDist=set.dist;
+    }else if(met==="carry"){
+      if(set.aLoad==null&&set.load!=null)set.aLoad=set.load;
       if(set.aDist==null&&set.dist!=null)set.aDist=set.dist;
     }else{
       if(set.aLoad==null){const pl=plannedLoad(set,ex);if(pl)set.aLoad=pl;}
-      if(set.aReps==null&&set.reps!=null)set.aReps=set.reps;
+      if(set.aReps==null&&set.reps!=null&&set.reps!=="AMRAP")set.aReps=set.reps;
       if(set.aRpe==null&&set.rpe!=null)set.aRpe=set.rpe;
     }
     set.date=today();
     buzz(40);
-    if(!(ex&&ex.metric==="cardio"))restStart();
+    if(met!=="cardio")restStart(it.rest||S.settings.rest);
   }
   persist();render();}
 function finishRun(){
@@ -871,7 +924,7 @@ async function chooseForMuscle(ei){
 
 /* ===================== DRAG & DROP ===================== */
 let dnd=null;
-function dragStart(e,kind,a,b){
+function dragStart(e,kind,a,b,wi,di){
   e.preventDefault();e.stopPropagation();
   const sel=kind==="wk"?".wcard":kind==="week"?".weekcol":".card";
   const el=e.target.closest(sel);if(!el)return;
@@ -881,7 +934,7 @@ function dragStart(e,kind,a,b){
   ghost.style.left=r.left+"px";ghost.style.top=r.top+"px";ghost.style.width=r.width+"px";
   document.body.appendChild(ghost);
   el.classList.add("drag-src");
-  dnd={kind,a,b,el,ghost,dx:e.clientX-r.left,dy:e.clientY-r.top,idx:null,wi:null};
+  dnd={kind,a,b,el,ghost,dx:e.clientX-r.left,dy:e.clientY-r.top,idx:null,wi:null,exWi:wi,exDi:di};
   document.body.style.userSelect="none";
   window.addEventListener("pointermove",dragMove,{passive:false});
   window.addEventListener("pointerup",dragEnd,{once:true});
@@ -897,7 +950,9 @@ function dragMove(e){
 }
 function siblings(kind){
   const sel=kind==="wk"?'.wcard':kind==="week"?'.weekcol':'[data-drag="ex"]';
-  return [...document.querySelectorAll(sel)].filter(n=>!n.classList.contains("drag-src"));
+  let els=[...document.querySelectorAll(sel)].filter(n=>!n.classList.contains("drag-src"));
+  if(kind==="ex")els=els.filter(n=>+n.dataset.wi===dnd.exWi&&+n.dataset.di===dnd.exDi);
+  return els;
 }
 function computeTarget(x,y){
   const dl=$("#dropline");
@@ -921,7 +976,7 @@ function computeTarget(x,y){
     let idx=sibs.length;
     for(let i=0;i<sibs.length;i++){const r=sibs[i].getBoundingClientRect();if(y<r.top+r.height/2){idx=i;break;}}
     dnd.idx=idx;
-    const cont=dnd.kind==="week"?$("#app"):$("#app");
+    const cont=dnd.kind==="ex"?(dnd.el.parentElement||$("#app")):$("#app");
     placeLine(cont,sibs,idx);
   }
 }
@@ -944,7 +999,7 @@ function dragEnd(e){
   if(d.idx==null){render();return;}
   if(d.kind==="wk"&&d.wi!=null) moveWorkout(d.a,d.b,d.wi,d.idx);
   else if(d.kind==="week") moveWeek(d.a,d.idx);
-  else if(d.kind==="ex") moveExercise(edit.wi,edit.di,d.a,d.idx);
+  else if(d.kind==="ex") moveExercise(d.exWi,d.exDi,d.a,d.idx);
   render();
 }
 function moveWorkout(fromWi,fromDi,toWi,toIdx){const weeks=curP().weeks;const [m]=weeks[fromWi].days.splice(fromDi,1);weeks[toWi].days.splice(toIdx,0,m);persist();}
@@ -955,7 +1010,7 @@ function moveExercise(wi,di,from,to){const items=wk(wi,di).items;const [m]=items
 function loggedSets(){
   const out=[];
   S.programs.forEach(p=>p.weeks.forEach((w,wi)=>w.days.forEach(d=>d.items.forEach(it=>it.sets.forEach(s=>{
-    if(s.done&&s.aLoad&&s.aReps) out.push({exId:itemKey(it),load:+s.aLoad,reps:+s.aReps,e1:e1rm(+s.aLoad,+s.aReps),pn:p.name,wn:w.name,wi,date:s.date});
+    if(s.done&&s.aLoad&&s.aReps) out.push({exId:itemKey(it),load:+s.aLoad,reps:+s.aReps,e1:e1rm(+s.aLoad,+s.aReps,s.aRpe!=null?+s.aRpe:null),pn:p.name,wn:w.name,wi,date:s.date});
   })))));
   return out;
 }
@@ -1202,7 +1257,8 @@ function exEditorCard(ex){
     <div class="grid3 mb">
       <select onchange="setEx('${ex.id}','category',this.value)">${cats.map(c=>`<option ${ex.category===c?"selected":""}>${c}</option>`).join("")}</select>
       <select onchange="setEx('${ex.id}','metric',this.value);render()">
-        <option value="weight" ${ex.metric!=="cardio"?"selected":""}>Charge×reps</option>
+        <option value="weight" ${(ex.metric!=="cardio"&&ex.metric!=="carry")?"selected":""}>Charge×reps</option>
+        <option value="carry" ${ex.metric==="carry"?"selected":""}>Distance×charge</option>
         <option value="cardio" ${ex.metric==="cardio"?"selected":""}>Cardio</option>
       </select>
       <select onchange="setEx('${ex.id}','lift',this.value)" title="Mouvement de compétition (DOTS)">${lifts.map(([v,l])=>`<option value="${v}" ${(ex.lift||"")===v?"selected":""}>${l}</option>`).join("")}</select>
@@ -1236,6 +1292,8 @@ document.addEventListener("input",e=>{
   }else if(k==="log"){
     const set=runWorkout().items[+t.dataset.ei].sets[+t.dataset.si];
     set[t.dataset.f]=num();persist();
+  }else if(k==="rest"){
+    const it=wk(+t.dataset.wi,+t.dataset.di).items[+t.dataset.ei];it.rest=v===""?null:Math.max(0,Math.round(+v.replace(",",".")));persist();
   }else if(k==="orm"){
     const ex=exById(t.dataset.id);ex.orm=v===""?0:+v.replace(",",".");persist();
   }else if(k==="exname"){
