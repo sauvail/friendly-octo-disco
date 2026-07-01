@@ -226,6 +226,16 @@ describe("Tout éditer (multi-column)", () => {
     cy.get(".editcol").first().find('input[data-f="load"]').first().clear().type("142.5");
     cy.get(".editcol").first().find('input[data-f="load"]').first().should("have.value", "142.5");
   });
+
+  it("shows one week at a time with prev/next navigation", () => {
+    cy.contains("button", "Semaine").click(); // add an empty week 2
+    cy.contains("button", "Tout éditer").click();
+    cy.get(".weeknav").should("contain", "1/2"); // starts on week 1
+    cy.get(".editcol").should("have.length", 2); // Séance A + B only (week 1)
+    cy.get(".weeknav button").contains("Suiv.").click();
+    cy.get(".weeknav").should("contain", "2/2"); // advanced to week 2
+    cy.contains("Aucune séance dans cette semaine"); // week 2 is empty
+  });
 });
 
 describe("Muscle wildcard at run time", () => {

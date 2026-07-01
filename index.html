@@ -174,8 +174,12 @@ body.running #app{padding-bottom:calc(176px + env(safe-area-inset-bottom))} /* k
 .modchip{font-size:12px;background:var(--card2);border:1px solid var(--line);border-radius:8px;padding:3px 9px;color:var(--mut);display:inline-flex;gap:6px;align-items:center}
 .modchip b{color:var(--red);cursor:pointer;font-weight:400}
 .editcols{display:flex;gap:12px;overflow-x:auto;width:100vw;margin-left:calc(50% - 50vw);padding:0 14px 14px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
-.editcol{flex:0 0 86vw;max-width:340px;scroll-snap-align:start;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px}
-@media(min-width:560px){.editcol{flex:0 0 320px}}
+/* one week at a time → columns grow to fill the width; overflow-scroll only if they can't fit */
+.editcol{flex:1 1 0;min-width:280px;scroll-snap-align:start;background:var(--card2);border:1px solid var(--line);border-radius:14px;padding:12px}
+.weeknav{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:6px 8px}
+.weeknav .wnav-title{font-weight:700;text-align:center;flex:1;min-width:0}
+.weeknav button{flex:none}
+.weeknav button[disabled]{opacity:.35;pointer-events:none}
 .runbtn2{background:var(--acc);color:#fff;border:none;border-radius:9px;min-height:0;padding:7px 11px;font-size:14px}
 .repcell{display:flex;gap:2px;min-width:0}.repcell>input{flex:1;min-width:0}
 .ambtn{width:26px;flex:none;background:var(--card2);border:1px solid var(--line);color:var(--mut);min-height:0;padding:0;font-size:13px;border-radius:8px}
@@ -316,6 +320,7 @@ let runDraft=null;        // live execution draft — decoupled from the saved p
 let statEx=null;          // stats per-exercise detail
 let statSess=null;        // stats: a past session being inspected
 let editAll=false;        // multi-column "edit all séances" view
+let editAllWi=0;          // which week the edit-all view is showing
 const COLL=new Set();     // collapsed week ids (ephemeral)
 
 function load(){
@@ -737,19 +742,28 @@ function viewEditor(){
 }
 function viewEditAll(){
   const p=curP();
+  const head=`<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a></div>
+    <div class="row between"><h1 style="margin:0">Éditer les séances</h1><span class="mut">${esc(p.name)}</span></div>`;
+  if(!p.weeks.length) return head+`<div class="empty">Aucune semaine. Ajoute-en depuis le tableau.</div>`;
+  editAllWi=Math.max(0,Math.min(p.weeks.length-1,editAllWi));
+  const wi=editAllWi,w=p.weeks[wi];
+  const nav=`<div class="weeknav mb">
+    <button class="gh sm" ${wi<=0?'disabled':''} onclick="editAllWeek(-1)">‹ Préc.</button>
+    <span class="wnav-title">${esc(w.name)} <span class="mut">· ${wi+1}/${p.weeks.length}</span></span>
+    <button class="gh sm" ${wi>=p.weeks.length-1?'disabled':''} onclick="editAllWeek(1)">Suiv. ›</button>
+  </div>`;
   let cols="";
-  p.weeks.forEach((w,wi)=>w.days.forEach((d,di)=>{
+  w.days.forEach((d,di)=>{
     cols+=`<div class="editcol">
       <div class="row between mb" style="gap:6px;align-items:flex-start">
-        <div style="min-width:0"><div class="mut">${esc(w.name)}</div><div style="font-weight:700;font-size:16px">${esc(d.name)}</div><div class="mut"><span class="planmeta" data-mwi="${wi}" data-mdi="${di}">${planMetaText(d)}</span></div></div>
+        <div style="min-width:0"><div style="font-weight:700;font-size:16px">${esc(d.name)}</div><div class="mut"><span class="planmeta" data-mwi="${wi}" data-mdi="${di}">${planMetaText(d)}</span></div></div>
         <div class="row" style="gap:4px;flex:none"><button class="runbtn2" onclick="openRun(${wi},${di})">▶</button><button class="iconbtn" onclick="workoutMenu(event,${wi},${di})">⋯</button></div>
       </div>`+itemsEditorHtml(wi,di,false)+`</div>`;
-  }));
-  return `<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a></div>
-    <div class="row between"><h1 style="margin:0">Tout éditer</h1><span class="mut">${esc(p.name)}</span></div>
-    <div class="mut mb">Toutes les séances — fais défiler horizontalement →</div>`+
-    (cols?`<div class="editcols">${cols}</div>`:`<div class="empty">Aucune séance. Ajoute-en depuis le tableau.</div>`);
+  });
+  return head+nav+
+    (cols?`<div class="editcols">${cols}</div>`:`<div class="empty">Aucune séance dans cette semaine. Ajoute-en depuis le tableau.</div>`);
 }
+function editAllWeek(delta){const n=curP().weeks.length;editAllWi=Math.max(0,Math.min(n-1,editAllWi+delta));scrollTop();render();}
 
 /* ----- in-workout helpers: plates, last-time, rest timer, wake lock ----- */
 function platesFor(target,bar){
@@ -911,7 +925,7 @@ function viewRun(){
 /* ----- board navigation ----- */
 function selProg(i){curPi=i;edit=null;running=null;runDraft=null;editAll=false;closeMenu();scrollTop();render();}
 function openEditor(wi,di){edit={wi,di};running=null;runDraft=null;editAll=false;closeMenu();scrollTop();render();}
-function openEditAll(){editAll=true;edit=null;running=null;runDraft=null;closeMenu();scrollTop();render();}
+function openEditAll(){editAll=true;editAllWi=0;edit=null;running=null;runDraft=null;closeMenu();scrollTop();render();}
 function openRun(wi,di){running={wi,di};runDraft=buildDraft(wi,di);edit=null;editAll=false;closeMenu();wakeOn();scrollTop();render();}
 function backToBoard(){edit=null;running=null;runDraft=null;editAll=false;wakeOff();restSkip();scrollTop();render();}
 function toggleColl(id){COLL.has(id)?COLL.delete(id):COLL.add(id);render();}
