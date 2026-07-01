@@ -219,9 +219,9 @@ describe("Données / library / settings", () => {
   });
 });
 
-describe("Tout éditer (multi-column)", () => {
+describe("Éditer le programme (multi-column)", () => {
   it("edits every séance at once in columns", () => {
-    cy.contains("button", "Tout éditer").click();
+    cy.contains("button", "Éditer le programme").click();
     cy.get(".editcol").should("have.length.at.least", 2);
     cy.get(".editcol").first().find('input[data-f="load"]').first().clear().type("142.5");
     cy.get(".editcol").first().find('input[data-f="load"]').first().should("have.value", "142.5");
@@ -229,7 +229,7 @@ describe("Tout éditer (multi-column)", () => {
 
   it("shows one week at a time with prev/next navigation", () => {
     cy.contains("button", "Semaine").click(); // add an empty week 2
-    cy.contains("button", "Tout éditer").click();
+    cy.contains("button", "Éditer le programme").click();
     cy.get(".weeknav").should("contain", "1/2"); // starts on week 1
     cy.get(".editcol").should("have.length", 2); // Séance A + B only (week 1)
     cy.get(".weeknav button").contains("Suiv.").click();
@@ -290,8 +290,8 @@ describe("Stress index, duration, rest, AMRAP, carry, edit-all drag", () => {
     cy.contains(".lab", "MÈTRES");
   });
 
-  it("allows reordering exercises in Tout éditer (grips present)", () => {
-    cy.contains("button", "Tout éditer").click();
+  it("allows reordering exercises in the program editor (grips present)", () => {
+    cy.contains("button", "Éditer le programme").click();
     cy.get('.editcol [data-drag="ex"]').should("exist");
     cy.get(".editcol .grip").should("exist");
   });
@@ -358,7 +358,7 @@ describe("Sessions, history, phone Back, done-state, joker history", () => {
     cy.contains(".wcard", "Séance A").find(".runbtn").click();
     cy.contains("#app h1", "Séance A");
     cy.go("back");
-    cy.contains("button", "Tout éditer").should("exist"); // back on the board
+    cy.contains("button", "Éditer le programme").should("exist"); // back on the board
     cy.get(".wcard").should("exist");
   });
 
@@ -366,7 +366,7 @@ describe("Sessions, history, phone Back, done-state, joker history", () => {
     cy.openWorkout("Séance A");
     cy.contains("#app h1", "Séance A");
     cy.go("back");
-    cy.contains("button", "Tout éditer").should("exist");
+    cy.contains("button", "Éditer le programme").should("exist");
   });
 
   // A joker slot surfaces what was done for that muscle last time, drawn from session history.

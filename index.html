@@ -645,7 +645,7 @@ function viewBoard(){
     `<button class="chip add" onclick="addProgram()">＋</button></div>
     <div class="row between mb"><h1 style="margin:0">${esc(p.name)}</h1>
       <button class="iconbtn" onclick="progMenu(event)">⋯</button></div>`;
-  if(p.weeks.some(w=>w.days.length)) h+=`<button class="full gh mb" onclick="openEditAll()">✎ Tout éditer les séances</button>`;
+  if(p.weeks.some(w=>w.days.length)) h+=`<button class="full gh mb" onclick="openEditAll()">✎ Éditer le programme (vue colonnes)</button>`;
   if(!(S.sessions||[]).length && p.weeks.some(w=>w.days.length))
     h+=`<div class="hint">👋 Touche <b>▶</b> sur une séance pour t'entraîner. Tes séances enregistrées s'afficheront dans <b>📈 Stats</b>.</div>`;
   if(!p.weeks.length){
@@ -758,7 +758,7 @@ function viewEditor(){
 function viewEditAll(){
   const p=curP();
   const head=`<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a></div>
-    <div class="row between"><h1 style="margin:0">Éditer les séances</h1><span class="mut">${esc(p.name)}</span></div>`;
+    <div class="row between"><h1 style="margin:0">Éditer le programme</h1><span class="mut">${esc(p.name)}</span></div>`;
   if(!p.weeks.length) return head+`<div class="empty">Aucune semaine. Ajoute-en depuis le tableau.</div>`;
   editAllWi=Math.max(0,Math.min(p.weeks.length-1,editAllWi));
   const wi=editAllWi,w=p.weeks[wi];
