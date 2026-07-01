@@ -54,7 +54,7 @@ Set (carry)  = { id, load, dist }          // load (kg) × distance (m)
 Set (cardio) = { id, dur, dist }
   Plan sets hold targets only — a run never mutates them. Actuals are stored in S.sessions.
 
-Session = { id, ts, date, programName, weekName, dayId, dayName, entries: [ Entry ] }
+Session = { id, ts, date, programName, weekName, dayId, dayName, note?, entries: [ Entry ] }
 Entry   = { exId, muscle, name, metric, sets: [ { load, reps, rpe } | {load,dist} | {dur,dist} ] }
   One Session is appended each time you finish a run; only the sets you marked done are kept.
   dayId links a session back to the plan day it came from (used for the board's "last session" line).
@@ -153,6 +153,8 @@ Start a workout from a card's **▶** (on the board or an edit-all column — th
 - **± steppers** on load and reps (no keyboard needed); RPE is a direct input. Load step = the rounding setting; reps step = 1.
 - **RPE → load suggestion** — for an **RPE-only set** (planned by reps + target RPE, no preset load), the run suggests a working kg = `best e1RM(exercise) × RPE_PCT[reps][RPE]/100`, shown as a tap-to-fill 💡 hint (`suggestLoad`). It also seeds the input placeholder, the plate calc, the ± stepper base, and auto-fills when you tick the set off. Needs prior logged history for that exercise.
 - **Warm-up ramp** — for a loaded exercise, a `🔥 Échauffement : bar · …` line ramps ~40/55/70/85 % to the working load (`warmupRamp`).
+- **Back-off calculator** — **↓ Séries back-off…** on each weight exercise opens a modal (sets · reps · RPE) that computes the load live from the exercise's e1RM anchor (best logged, or inferred from a loaded set) and **appends the back-off sets** to the run (`modalBackoff` / `backoffAnchorE1`).
+- **Session note** — a **📝 Note** button in the run header captures a free-text note (ressenti, douleurs…) saved with the session on finish; also editable later from the history detail.
 - **Plate calculator** — for each set, shows the plates **per side** for the target/actual load given the configured **bar weight** (chips, e.g. `25 25 2.5 / côté`). Greedy from `[25, 20, 15, 10, 5, 2.5, 1.25]`.
 - **"Last time" reference** — `↺ <date> : <top set>` from your most recent **session** for that exercise. A **joker slot** also shows `↺ <date> · <exercise> <load>×<reps>` for that **muscle** (whatever filled it last time), and the run-time chooser annotates each candidate with its last result.
 - **Clear "set done" state** — a completed set's row turns green with an accent border, an enlarged ✓, and the target line struck through.
@@ -178,6 +180,8 @@ Computed from your **logged** sets. **Estimated 1RM** uses the **Tuchscherer / R
 
 - **Séances récentes (historique d'exécution)** — a reverse-chronological list of your stored sessions; tap one to see every exercise and the exact sets you logged (kg×reps@RPE / min·km / kg·m, with e1RM), plus a **Supprimer cette séance** action (undoable). The heading is **always shown** — before your first finished run it displays a placeholder so you know where history will appear. Each logged set also stores its **plan target** (`t`), so the detail shows **planned vs actual** ("cible …") wherever you deviated. Every stat below is computed from these sessions (`loggedSets()` flattens them — the single source of truth).
 - **Séries par muscle (7 j)** — working sets per muscle group over the last 7 days (from muscle tags), with a colour-coded bar and a hypertrophy guide range (~10–20 sets/muscle/week): orange = under, green = in range, red = over.
+- **Charge planifiée par bloc (fatigue prévue)** — per program (block), the **planned** weekly Stress Index as a bar profile + total (`blockCompareHtml`), on a common scale so you can compare predicted fatigue between blocks. Uses plan data, so it shows even before any session is logged.
+- **Session notes** — each session's note is shown at the top of its detail and can be edited there (`editSessNote`).
 - **Poids de corps** — log today's bodyweight + a date-accurate line chart; relative strength uses the latest value.
 - **Score DOTS / Wilks** — from the best logged e1RM of squat + bench + deadlift (by `lift` tag) and latest bodyweight + sex. Both coefficient sets are implemented (men/women).
 - **Records (e1RM estimé)** — best estimated 1RM per main lift, with **× bodyweight** relative strength; tap through to the exercise's history.

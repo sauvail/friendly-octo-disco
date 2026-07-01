@@ -146,6 +146,10 @@ body.running #app{padding-bottom:calc(176px + env(safe-area-inset-bottom))} /* k
 .suggbtn .mut{font-weight:400}
 .warmup{font-size:12px;color:var(--orange);background:rgba(255,138,76,.1);border-radius:8px;padding:5px 9px;margin:0 0 8px 0}
 .hint{background:rgba(79,140,255,.1);border:1px solid var(--acc);color:var(--txt);border-radius:11px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.5}
+.notebox{background:var(--card2);border:1px solid var(--line);border-radius:10px;padding:8px 11px;margin-bottom:10px;font-size:13px;white-space:pre-wrap;line-height:1.5}
+.blockbars{display:flex;align-items:flex-end;gap:4px;height:46px}
+.blockbars .bb{flex:1;min-width:5px;height:100%;background:var(--card);border-radius:4px 4px 0 0;display:flex;align-items:flex-end;overflow:hidden}
+.blockbars .bb>span{display:block;width:100%;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}
 .plates{display:flex;flex-wrap:wrap;gap:5px;margin:-2px 0 8px 40px}
 .plate{font-size:11px;font-weight:700;color:#06231a;background:var(--green);border-radius:6px;padding:2px 7px}
 .callbl,.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
@@ -412,6 +416,17 @@ function warmupRamp(work){
   const out=[bar];
   [0.4,0.55,0.7,0.85].forEach(p=>{const v=roundTo(work*p);if(v>out[out.length-1]&&v<work)out.push(v);});
   return out;
+}
+/* an e1RM anchor for back-off maths: best logged e1RM, else inferred from a set that already has a load */
+function backoffAnchorE1(it){
+  const b=bestE1For(it.exId);if(b)return b;
+  for(const s of it.sets){
+    const ld=s.aLoad!=null?+s.aLoad:(s.load!=null?+s.load:null);
+    const rp=s.aReps!=null?+s.aReps:(s.reps==="AMRAP"?null:(s.reps!=null?+s.reps:null));
+    const rpe=s.aRpe!=null?+s.aRpe:(s.rpe!=null?+s.rpe:8);
+    if(ld&&rp){const p=rpePct(Math.round(rp),rpe);if(p)return ld/(p/100);}
+  }
+  return null;
 }
 /* Estimated 1RM via the Tuchscherer / RTS RPE→%1RM chart (reps 1-12 × RPE 6-10); Epley fallback outside the table. */
 const RPE_PCT={
@@ -804,6 +819,8 @@ function stepField(ei,si,f,delta){
   set[f]=v;render();   // draft is ephemeral — no persist until finishRun
 }
 function useSugg(ei,si,val){const set=runWorkout().items[ei].sets[si];set.aLoad=val;render();}
+async function editRunNote(){if(!runDraft)return;const v=await modalPrompt("Note de séance",runDraft.note||"",{title:"Note de séance",ph:"ressenti, douleurs, ajustements…"});if(v==null)return;runDraft.note=v;render();}
+async function editSessNote(id){const se=(S.sessions||[]).find(s=>s.id===id);if(!se)return;const v=await modalPrompt("Note de séance",se.note||"",{title:"Note de séance",ph:"ressenti, douleurs, ajustements…"});if(v==null)return;se.note=v.trim();persist();render();}
 /* Deadline-based so the countdown stays correct across phone lock / app backgrounding. */
 let restRem=0,restTmr=null,restEndAt=0;
 function fmtTime(s){s=Math.max(0,s|0);return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");}
@@ -849,10 +866,11 @@ function viewRun(){
   const{tot,done}=setProgress(d);
   const STEP=S.settings.round||2.5;
   let h=`<div class="crumb"><a onclick="backToBoard()">‹ ${esc(p.name)}</a></div>
-    <h1 style="margin:0 0 2px">${esc(d.dayName)}</h1>
+    <div class="row between"><h1 style="margin:0 0 2px">${esc(d.dayName)}</h1><button class="sm gh" style="flex:none" onclick="editRunNote()">📝 Note</button></div>
     <div class="mut">${esc(d.weekName)}</div>
     <div class="bar mt"><span style="width:${tot?done/tot*100:0}%"></span></div>
-    <div class="mut mb" style="margin-top:4px">${done}/${tot} séries faites</div>`;
+    <div class="mut" style="margin-top:4px">${done}/${tot} séries faites</div>
+    ${d.note?`<div class="notebox">📝 ${esc(d.note)}</div>`:''}<div class="mb"></div>`;
   if(!d.items.length) h+=`<div class="empty">Aucun exercice dans cette séance.<br><button class="gh sm" onclick="openEditor(${running.wi},${running.di})">Planifier</button></div>`;
   const glR=groupLabels(d.items);
   d.items.forEach((it,ei)=>{
@@ -915,6 +933,7 @@ function viewRun(){
         ${sugg?`<button class="suggbtn" onclick="useSugg(${ei},${si},${sugg})">💡 ${sugg} kg suggéré <span class="mut">· d'après e1RM @${fmt(set.rpe!=null?set.rpe:8)}</span></button>`:''}
         ${pls.length?`<div class="plates">${pls.map(x=>`<span class="plate">${fmt(x)}</span>`).join("")}<span class="mut" style="font-size:11px;align-self:center">/ côté</span></div>`:''}`;
       });
+      h+=`<button class="full gh sm" onclick="modalBackoff(${ei})">↓ Séries back-off…</button>`;
     }
     h+=`</div>`;
   });
@@ -1087,7 +1106,7 @@ function finishRun(){
     entries.push({exId:it.exId||null,muscle:it.muscle||null,name:ex?ex.name:(it.muscle?"💪 "+it.muscle:"?"),metric:met,sets});
   });
   if(!n){toast("Aucune série faite");return close();}
-  S.sessions.push({id:uid(),ts:Date.now(),date:today(),programName:dr.programName,weekName:dr.weekName,dayId:dr.dayId,dayName:dr.dayName,entries});
+  S.sessions.push({id:uid(),ts:Date.now(),date:today(),programName:dr.programName,weekName:dr.weekName,dayId:dr.dayId,dayName:dr.dayName,note:(dr.note||"").trim(),entries});
   persist();toast(n+" séries enregistrées");close();
 }
 async function chooseForMuscle(ei){
@@ -1264,6 +1283,23 @@ function setsPerMuscle(days){
   });
   return m;
 }
+/* Compare programs (blocks) by PLANNED Stress Index per week — a predicted-fatigue profile. */
+function blockCompareHtml(){
+  const progs=S.programs||[];if(!progs.length)return "";
+  const rows=progs.map(p=>({name:p.name,weeks:p.weeks.map(w=>weekStress(w))}));
+  const all=rows.flatMap(r=>r.weeks);const mx=Math.max(1,...all);
+  if(!all.some(v=>v>0))return "";   // nothing planned yet
+  let h=`<h2>Charge planifiée par bloc <span class="mut" style="font-size:13px;font-weight:400">· fatigue prévue</span></h2>`;
+  rows.forEach((r,i)=>{
+    const tot=r.weeks.reduce((a,b)=>a+b,0);
+    h+=`<div class="card">
+      <div class="row between mb"><span style="font-weight:600;min-width:0">${esc(r.name)}${i===curPi?' <span class="mut">· actuel</span>':''}</span><span>Σ ${fmtStress(tot)}</span></div>
+      <div class="blockbars">${r.weeks.length?r.weeks.map((v,wi)=>`<div class="bb" title="Semaine ${wi+1} · stress ${fmtStress(v)}"><span style="height:${Math.round(v/mx*100)}%"></span></div>`).join(""):`<span class="mut">aucune semaine</span>`}</div>
+    </div>`;
+  });
+  h+=`<div class="mut mb">Barres = Stress Index planifié par semaine (échelle commune entre blocs).</div>`;
+  return h;
+}
 function exportCsv(){
   const rows=[["date","programme","semaine","exercice","categorie","kg","reps","rpe","min","km","e1RM"]];
   (S.sessions||[]).forEach(se=>se.entries.forEach(en=>{const ex=en.exId?exById(en.exId):null;en.sets.forEach(s=>{
@@ -1294,6 +1330,7 @@ function viewStats(){
     h+=lineSvg(bws.map(b=>({t:Date.parse(b.date)||0,v:b.kg})));
   }
   h+=`</div>`;
+  h+=blockCompareHtml();
   const sess=[...(S.sessions||[])].sort((a,b)=>b.ts-a.ts);
   h+=`<h2>Séances récentes</h2>`;
   if(sess.length){
@@ -1392,6 +1429,8 @@ function viewSession(){
   let h=`<div class="crumb"><a onclick="statSess=null;render()">‹ Stats</a></div>
     <h1 style="margin:0 0 2px">${esc(se.dayName||'Séance')}</h1>
     <div class="mut mb">${se.date}${se.weekName?' · '+esc(se.weekName):''}${se.programName?' · '+esc(se.programName):''}</div>`;
+  if(se.note)h+=`<div class="notebox">📝 ${esc(se.note)}</div>`;
+  h+=`<button class="full gh sm mb" onclick="editSessNote('${se.id}')">📝 ${se.note?'Modifier la note':'Ajouter une note'}</button>`;
   if(!se.entries.length)h+=`<div class="empty">Séance vide.</div>`;
   se.entries.forEach(en=>{
     h+=`<div class="card"><div style="font-weight:600;margin-bottom:6px">${esc(en.name)}</div>`+
@@ -1684,6 +1723,37 @@ function modalChoose(title,items,opts={}){
     $("#m_c").onclick=()=>{modalClose();res(null);};
     $(".scrim").addEventListener("click",e=>{if(e.target.classList.contains("scrim")){modalClose();res(null);}});
   });
+}
+/* Back-off calculator — compute load for a sets×reps@RPE scheme from the exercise's e1RM anchor, then append them. */
+function modalBackoff(ei){
+  const it=runWorkout()&&runWorkout().items[ei];if(!it)return;
+  const anchor=backoffAnchorE1(it);
+  const first=it.sets[0]||{};
+  const dReps=first.reps==="AMRAP"?5:(+first.reps||5);
+  const dRpe=Math.max(6,(first.rpe!=null?+first.rpe:8)-2);
+  const calc=(reps,rpe)=>{if(!anchor)return null;const p=rpePct(Math.round(reps),rpe);return p?roundTo(anchor*p/100):null;};
+  $("#modalRoot").innerHTML=`<div class="scrim"><div class="modal"><h3>Back-off — ${esc(itemName(it))}</h3>
+    <div class="mut mb">${anchor?`e1RM réf. ≈ ${Math.round(anchor)} kg`:`Pas d'historique — ajoute quand même, tu ajusteras la charge`}</div>
+    <div class="grid3 mb">
+      <div><label class="fld">Séries</label><input id="bo_s" inputmode="numeric" value="3"></div>
+      <div><label class="fld">Reps</label><input id="bo_r" inputmode="numeric" value="${dReps}"></div>
+      <div><label class="fld">RPE</label><input id="bo_p" inputmode="decimal" value="${dRpe}"></div>
+    </div>
+    <div class="card" style="text-align:center;margin-bottom:10px"><div class="mut">Charge back-off</div><div class="stat" id="bo_res">—</div><div class="mut" id="bo_sub"></div></div>
+    <div class="mrow"><button id="bo_c">Annuler</button><button id="bo_o" class="acc">Ajouter</button></div></div></div>`;
+  const rd=()=>({s:Math.max(1,Math.round(+$("#bo_s").value||1)),r:Math.max(1,Math.round(+$("#bo_r").value||1)),p:Math.min(10,Math.max(4,+$("#bo_p").value||8))});
+  const upd=()=>{const v=rd();const ld=calc(v.r,v.p);$("#bo_res").textContent=ld!=null?ld+" kg":"—";$("#bo_sub").textContent=`${v.s} × ${v.r} @${v.p}`;};
+  ["bo_s","bo_r","bo_p"].forEach(id=>$("#"+id).addEventListener("input",upd));
+  upd();
+  modalCancel=()=>modalClose();armBack();
+  $("#bo_c").onclick=()=>modalClose();
+  $("#bo_o").onclick=()=>{const v=rd();addBackoff(ei,v.s,v.r,v.p,calc(v.r,v.p));modalClose();};
+  $(".scrim").addEventListener("click",e=>{if(e.target.classList.contains("scrim"))modalClose();});
+}
+function addBackoff(ei,sets,reps,rpe,load){
+  const it=runWorkout()&&runWorkout().items[ei];if(!it)return;
+  for(let k=0;k<sets;k++)it.sets.push({load:null,reps:reps,rpe:rpe,aLoad:(load!=null?load:null),aReps:null,aRpe:null,aDur:null,aDist:null,done:false});
+  toast(sets+" séries back-off ajoutées");render();
 }
 let undoSnap=null,undoTimer=null;
 function snapshot(label){undoSnap=JSON.stringify(S);const s=$("#snack");$("#snackmsg").textContent=label;s.classList.add("show");clearTimeout(undoTimer);undoTimer=setTimeout(()=>s.classList.remove("show"),6000);}

@@ -518,3 +518,34 @@ describe("Upgrades: load suggestion, muscle volume, planned-vs-actual, warm-up, 
     cy.get("body").should("have.class", "light");
   });
 });
+
+describe("Back-off calculator, block comparator, session notes", () => {
+  it("adds back-off sets from the calculator during a run", () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains(".card", "Squat").find(".setline").its("length").then((n) => {
+      cy.contains(".card", "Squat").contains("button", "back-off").click();
+      cy.get(".modal").should("contain", "Back-off");
+      cy.get(".modal").contains("button", "Ajouter").click();
+      cy.contains(".card", "Squat").find(".setline").should("have.length", n + 3); // 3 back-off sets appended
+    });
+  });
+
+  it("shows planned Stress Index per block in Stats", () => {
+    cy.tab("Stats");
+    cy.contains("h2", "Charge planifiée par bloc");
+    cy.get(".blockbars .bb").should("exist");
+  });
+
+  it("captures a session note in the run and keeps it in history", () => {
+    cy.contains(".wcard", "Séance A").find(".runbtn").click();
+    cy.contains("button", "Note").click();
+    cy.get(".modal #m_i").type("jambes fatiguées");
+    cy.get(".modal #m_o").click();
+    cy.get(".notebox").should("contain", "jambes fatiguées"); // shown in the run
+    cy.get(".chk").first().click();
+    cy.contains("Terminer & enregistrer").click();
+    cy.tab("Stats");
+    cy.contains(".card", "Séance A").click();
+    cy.get(".notebox").should("contain", "jambes fatiguées"); // persisted to the session
+  });
+});
